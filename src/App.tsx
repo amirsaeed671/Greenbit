@@ -8,6 +8,7 @@ const CalendarPage = lazy(() => import('./pages/CalendarPage'));
 const HabitDetail = lazy(() => import('./pages/HabitDetail'));
 const HabitForm = lazy(() => import('./pages/HabitForm'));
 const Progress = lazy(() => import('./pages/Progress'));
+const Insights = lazy(() => import('./pages/Insights'));
 const Settings = lazy(() => import('./pages/Settings'));
 
 const s = (el: JSX.Element) => <Suspense fallback={null}>{el}</Suspense>;
@@ -18,6 +19,7 @@ export const routes = [
     children: [
       { path: '/', element: <Garden /> },
       { path: '/calendar', element: s(<CalendarPage />) },
+      { path: '/insights', element: s(<Insights />) },
       { path: '/progress', element: s(<Progress />) },
       { path: '/settings', element: s(<Settings />) },
       { path: '/habits/new', element: s(<HabitForm />) },

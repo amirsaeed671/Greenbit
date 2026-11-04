@@ -1,12 +1,13 @@
 import { NavLink, Link, Outlet } from 'react-router-dom';
 import { Celebration } from './Celebration';
-import { IconCalendar, IconGarden, IconSettings, IconSun } from './Icons';
+import { IconCalendar, IconChart, IconGarden, IconSettings, IconSun } from './Icons';
 import { Credit, LogoMark } from './Logo';
 import { Toasts } from './Toasts';
 
 const TABS = [
   { to: '/', label: 'Garden', Icon: IconGarden, end: true },
   { to: '/calendar', label: 'Calendar', Icon: IconCalendar },
+  { to: '/insights', label: 'Insights', Icon: IconChart },
   { to: '/progress', label: 'Progress', Icon: IconSun },
   { to: '/settings', label: 'Settings', Icon: IconSettings },
 ];

@@ -48,6 +48,7 @@ Habits can be **daily**, **weekly** or **monthly**. Log as many entries as you l
   - *Per habit*: daily cells coloured by tier. Weekly/monthly habits place the ✓ on the day the running total crossed the minimum, and tint the whole period.
   - *Combined*: every habit in one view, with ✓ / `2/3` / ✗ per day and a colour for the average tier.
 - 🗓️ **Gentle rules**: an open period is never marked ✗ and never breaks your streak. Missed periods let plants wilt a little; they recover with the next good period.
+- 📊 **Insights**: analytics for all habits or one, over 30 days, 90 days, 12 months or all time. Completion-rate trend, volume against your minimum/target/stretch lines, completion by habit, how periods turned out, a consistency heatmap and your best weekdays. Every chart has hover/keyboard tooltips and a table view.
 - ☀️ **Gamification**: sunlight per period (below 1 · minimum 10 · target 15 · stretch 25), levels on a `50 · n^1.5` curve, garden stages from *Patch of soil* to *Grove*, eight badges and petal celebrations when you cross a threshold.
 - 📜 **Daily quote** from public-domain translations of classic works (Marcus Aurelius, Seneca, Epictetus, Aristotle, William James and others), always with a named source.
 - 💾 **Export / import** as a single JSON file, validated with `zod`, with *merge* or *replace* applied atomically in one transaction. A nudge appears if you haven't backed up in 14 days.
@@ -56,6 +57,10 @@ Habits can be **daily**, **weekly** or **monthly**. Log as many entries as you l
 
 <p align="center">
   <img src="docs/screenshots/desktop-cal-habit.png" alt="Per-habit calendar on desktop, dark mode" width="780">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/desktop-insights.png" alt="Insights page with completion trend, per-habit completion, outcomes, consistency heatmap and weekday chart" width="780">
 </p>
 
 ## Getting started
@@ -86,12 +91,13 @@ React 18 · TypeScript · Vite · `vite-plugin-pwa` (Workbox) · Dexie (IndexedD
 ```
 src/
   core/         Pure, framework-free logic with unit tests
-                (periods, volume tiers, status, streaks, calendar, xp, plant, badges, backup)
+                (periods, volume tiers, status, streaks, calendar, analytics, xp, plant, badges, backup)
   data/         quotes.json, plant species
   db/           Dexie schema, repository (CRUD, import, reset), live-query hooks
   store/        Zustand UI state (today, calendar cursor, celebrations, toasts)
   components/   Plant, QuoteCard, Sheet, EntrySheet, MonthGrid, ThresholdBar…
-  pages/        Garden, Calendar, HabitDetail, HabitForm, Progress, Settings
+    charts/     Dependency-free SVG charts: line, column, bar list, heatmap
+  pages/        Garden, Calendar, Insights, HabitDetail, HabitForm, Progress, Settings
   styles/       Design tokens (light + dark) and global styles
 scripts/        validate-quotes.ts
 brand/          Logo sources and icon generator
@@ -114,6 +120,7 @@ interface Entry { id; habitId; date; volume; note? }
 - **Combined calendar**: weekly/monthly habits only count on their completion day (✓) or on the last day of a missed period (✗). They never count against the other days.
 - **Merge import** adds anything missing by id; if a record exists on both sides, the one edited most recently wins.
 - **Backups from newer app versions** are rejected with a clear message. A `migrate()` hook upgrades older formats.
+- **Chart colours** are validated, not eyeballed: charts use one green hue (lines, bars) and a single-hue ramp for the heatmap, checked for contrast and lightness steps in light and dark mode. The five-colour tier palette stays on the calendar, where ✓/✗/★ marks back it up.
 - Every tier colour is paired with a non-colour cue (✓, ✗, ★ for stretch, and text labels) so the calendar stays readable with colour-vision deficiencies.
 
 ### Quotes

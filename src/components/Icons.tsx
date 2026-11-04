@@ -31,3 +31,6 @@ export const IconRight = (p: SVGProps<SVGSVGElement>) => <svg {...base(p)}><path
 export const IconFlame = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base(p)}><path d="M12 22c4 0 7-3 7-7 0-4-3-6-4-9-1 2-2 3-4 3 0-2 0-4-2-6-1 4-5 6-5 12 0 4 3 7 8 7Z" /></svg>
 );
+export const IconChart = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></svg>
+);

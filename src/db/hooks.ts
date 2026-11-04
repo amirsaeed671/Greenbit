@@ -1,4 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
+import { useMemo } from 'react';
 import type { Entry, Habit, Settings } from '../core/types';
 import { DEFAULT_SETTINGS } from '../core/types';
 import { db } from './db';
@@ -20,10 +21,11 @@ export function useGardenData(): GardenData {
   const entries = useLiveQuery(() => db.entries.toArray(), []);
   const settings = useLiveQuery(() => repo.getSettings(), []);
   const all = habits ?? EMPTY_H;
+  const active = useMemo(() => all.filter((h) => !h.archivedAt).sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.name.localeCompare(b.name)), [all]);
   return {
     loaded: habits !== undefined && entries !== undefined && settings !== undefined,
     habits: all,
-    active: all.filter((h) => !h.archivedAt).sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.name.localeCompare(b.name)),
+    active,
     entries: entries ?? EMPTY_E,
     settings: settings ?? DEFAULT_SETTINGS,
   };
