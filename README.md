@@ -11,6 +11,7 @@
 </p>
 
 <p align="center">
+  <a href="https://greenbit-six.vercel.app"><strong>🌱 Open the live app</strong></a> ·
   <a href="https://amir-ali.me">Built by Amir Ali</a> ·
   <a href="#features">Features</a> ·
   <a href="#getting-started">Getting started</a> ·
@@ -123,7 +124,7 @@ interface Entry { id; habitId; date; volume; note? }
 
 ## Deployment
 
-The app is a static site, deployed on Vercel (`vercel.json` holds the SPA rewrite and cache headers for the service worker). Any static host works: build and serve `dist/`.
+Live at **[greenbit-six.vercel.app](https://greenbit-six.vercel.app)**. The app is a static site, deployed on Vercel from this repository on every push (`vercel.json` holds the SPA rewrite and cache headers for the service worker). Any static host works: build and serve `dist/`.
 
 ## Author
 
