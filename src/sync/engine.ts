@@ -23,9 +23,10 @@ interface SyncStatus {
   error?: string;
   fingerprint?: string;
   devices: Record<string, DeviceInfo>;
+  activity: SyncEvent[];
 }
 
-export const useSync = create<SyncStatus>(() => ({ enabled: false, phase: 'off', devices: {} }));
+export const useSync = create<SyncStatus>(() => ({ enabled: false, phase: 'off', devices: {}, activity: [] }));
 
 const CONFIG = 'sync:config';
 const STATE = 'sync:state';
@@ -74,15 +75,39 @@ class SyncError extends Error {
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Recent sync activity on this device (newest last), for Settings and bug reports. Never contains data. */
+export interface SyncEvent {
+  at: string;
+  what: string;
+}
+const LOG = 'sync:log';
+let activity: SyncEvent[] = [];
+let logTimer = 0;
+export function logSync(what: string) {
+  activity = [...activity, { at: new Date().toISOString(), what }].slice(-40);
+  useSync.setState({ activity });
+  window.clearTimeout(logTimer);
+  logTimer = window.setTimeout(() => void db.local.put({ key: LOG, value: activity }), 500);
+}
+const short = (etag: string | null | undefined) => (etag ? etag.replace(/"/g, '').slice(0, 6) : '-');
 /** Randomised, growing wait between conflict retries, so two writers stop colliding. */
 export const conflictBackoff = (attempt: number, rand = Math.random()) => Math.round(Math.min(4000, 300 * 2 ** attempt) * (0.5 + rand));
 
 async function request(method: 'GET' | 'PUT' | 'DELETE', body?: unknown, etag?: string): Promise<Response> {
   if (!keys) throw new Error('Sync is not set up');
+  const t0 = performance.now();
+  const b = body as { ifMatch?: string | null; force?: boolean } | undefined;
+  const res = await rawRequest(method, body, etag);
+  logSync(`${method} ${res.status} ${Math.round(performance.now() - t0)}ms${etag ? ` if-none-match ${short(etag)}` : ''}${b ? (b.force ? ' force' : ` if-match ${b.ifMatch === null ? 'none' : short(b.ifMatch)}`) : ''}${res.headers.get('etag') ? ` → ${short(res.headers.get('etag'))}` : ''}`);
+  return res;
+}
+
+function rawRequest(method: 'GET' | 'PUT' | 'DELETE', body?: unknown, etag?: string): Promise<Response> {
   return fetch(ENDPOINT, {
     method,
     headers: {
-      authorization: `Bearer ${keys.relayKey}`,
+      authorization: `Bearer ${keys!.relayKey}`,
       ...(body ? { 'content-type': 'application/json' } : {}),
       ...(etag && method === 'GET' ? { 'if-none-match': etag } : {}),
     },
@@ -108,11 +133,19 @@ async function syncOnce(force = false): Promise<void> {
   const saved = ((await db.local.get(STATE))?.value as { etag?: string; syncedHlc?: string } | undefined) ?? {};
   const me = await repo.deviceId();
 
+  let rejected = 0;
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     if (attempt > 0) await sleep(conflictBackoff(attempt - 1));
+    /*
+     * After two rejected conditional writes, write the merge of the copy we just downloaded
+     * unconditionally (what Repair does). Safe: every sync merges full state per record, so if
+     * this overwrote a write that landed in the last instant, that device sees its records
+     * missing on its next sync and sends them again. Nothing is lost; it just converges.
+     */
+    const forceThis = force || rejected >= 2;
     // Pending local changes = anything stamped after the last successful sync. Derived from the data,
     // so it survives reloads and closed tabs.
-    const pending = force || (await localMaxHlc()) > (saved.syncedHlc ?? '');
+    const pending = forceThis || (await localMaxHlc()) > (saved.syncedHlc ?? '');
     // Ask "only if changed" when nothing local is pending; otherwise we need the full state to merge.
     const res = await request('GET', undefined, pending ? undefined : saved.etag);
     if (res.status !== 200 && res.status !== 304 && res.status !== 204) throw new SyncError(`The sync relay had a problem (${res.status}). Retrying automatically.`, true);
@@ -137,6 +170,7 @@ async function syncOnce(force = false): Promise<void> {
       useSync.setState({ lastSyncedAt: new Date().toISOString() });
       return;
     }
+    if (res.status === 200) logSync(`pulled ${short(etag)}${pending ? ' (local changes pending)' : ''}`);
 
     const { state: local } = await localState();
     const m = mergeStates(local, remote);
@@ -160,10 +194,15 @@ async function syncOnce(force = false): Promise<void> {
     const stale = !mine || mine.name !== config.deviceName || Date.now() - Date.parse(mine.lastSeen) > 86400000;
     if (stale) devices[me] = { name: config.deviceName, lastSeen: new Date().toISOString() };
 
-    if (m.remoteChanged || stale || res.status === 204 || force) {
+    const applied = Object.values(m.toLocal).reduce((n, xs) => n + (xs?.length ?? 0), 0);
+    if (applied) logSync(`applied ${applied} change${applied === 1 ? '' : 's'} from other devices`);
+    if (m.remoteChanged || stale || res.status === 204 || forceThis) {
       const sealed = await seal(keys.encKey, { ...m.state, devices } satisfies RemoteState);
-      const put = await request('PUT', force ? { data: sealed, force: true } : { data: sealed, ifMatch: res.status === 204 ? null : etag });
-      if (put.status === 412) continue; // another device wrote first: wait a moment, pull and merge again
+      const put = await request('PUT', forceThis ? { data: sealed, force: true } : { data: sealed, ifMatch: res.status === 204 ? null : etag });
+      if (put.status === 412) {
+        rejected++;
+        continue; // another device wrote first: wait a moment, pull and merge again
+      }
       if (put.status === 413) throw new SyncError('Your data is too large to sync (over 4 MB compressed).', false);
       if (!put.ok) throw new SyncError(`The sync relay had a problem (${put.status}). Retrying automatically.`, true);
       etag = ((await put.json()) as { etag: string }).etag;
@@ -173,7 +212,7 @@ async function syncOnce(force = false): Promise<void> {
     useSync.setState({ lastSyncedAt: new Date().toISOString(), devices, error: undefined });
     return;
   }
-  throw new SyncError('Another device kept syncing at the same moment. Retrying automatically, or use Repair sync.', true);
+  throw new SyncError('Couldn’t save to the sync relay. Retrying automatically, or use Repair sync.', true);
 }
 
 let retryTimer = 0;
@@ -204,6 +243,7 @@ export function syncNow(force = false): Promise<void> {
       useSync.setState({ phase: 'idle', error: undefined });
     })
     .catch((e: Error) => {
+      logSync(`error: ${e.message}`);
       useSync.setState({ phase: 'error', error: e.message });
       if (!(e instanceof SyncError) || e.retry) retryTimer = window.setTimeout(() => void syncNow(), retryDelay(retryCount++));
     })
@@ -275,6 +315,8 @@ export function startSyncEngine(): () => void {
   const visible = () => document.visibilityState === 'visible';
 
   void (async () => {
+    activity = ((await db.local.get(LOG))?.value as SyncEvent[] | undefined) ?? [];
+    useSync.setState({ activity });
     const c = await getConfig();
     if (!c) return;
     keys = await deriveKeys(b64u.dec(c.seed));

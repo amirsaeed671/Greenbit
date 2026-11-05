@@ -7,6 +7,7 @@ import { taskRepo } from '../../db/taskRepo';
 import { useUI } from '../../store/ui';
 import { notificationPermission, requestNotifications } from '../../reminders/scheduler';
 import { dueLabel } from './format';
+import { TimeSelect } from '../TimeSelect';
 
 export interface QuickAddDefaults {
   projectId?: string;
@@ -142,10 +143,10 @@ export function QuickAdd({ projects, labels, weekStartsOn, defaults = {}, onClos
           <input type="date" value={dueDate ?? ''} onChange={(e) => setManualDate(e.target.value)} aria-label="Due date" disabled={!!parsed.dueDate} />
         </label>
         {dueDate && (
-          <label className={`chip${dueTime ? ' set' : ''}`}>
+          <span className={`chip chip-time-wrap${dueTime ? ' set' : ''}`}>
             <span aria-hidden="true">🕘</span>
-            <input type="time" value={dueTime ?? ''} onChange={(e) => setManualTime(e.target.value)} aria-label="Due time" disabled={!!parsed.dueTime} className="chip-time" />
-          </label>
+            <TimeSelect label="Due time" value={dueTime} onChange={(v) => setManualTime(v ?? '')} disabled={!!parsed.dueTime} className="compact" />
+          </span>
         )}
         <label className={`chip${priority < 4 ? ' set' : ''}`}>
           <span className={`flag p${priority}`} aria-hidden="true">⚑</span>

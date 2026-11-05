@@ -495,11 +495,14 @@ kbd { font: inherit; font-size: 0.8em; padding: 1px 6px; border: 1px solid var(-
 .weekday-picker button[aria-pressed='true'] { background: var(--brand); border-color: var(--brand); color: #fff; }
 
 /* ---------- notes ---------- */
-.notes-layout { display: grid; grid-template-columns: 1fr; gap: 20px; max-width: 1200px; margin: 0 auto; }
+.notes-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; max-width: 1200px; margin: 0 auto; }
+/* Grid and flex children default to min-width: auto, which lets wide content (the toolbar row,
+   a long link) stretch the page past the screen, so phones zoom out. Let them shrink instead. */
+.notes-list, .notes-main, .note-pane, .note-editor, .note-prose { min-width: 0; }
 .notes-layout.has-note .notes-list { display: none; }
 .notes-layout:not(.has-note) .notes-main { display: none; }
 @media (min-width: 1000px) {
-  .notes-layout, .notes-layout.has-note { grid-template-columns: 300px 1fr; }
+  .notes-layout, .notes-layout.has-note { grid-template-columns: 300px minmax(0, 1fr); }
   .notes-layout .notes-list, .notes-layout.has-note .notes-list { display: block; }
   .notes-layout:not(.has-note) .notes-main { display: block; }
   .note-back { display: none; }
@@ -526,7 +529,9 @@ kbd { font: inherit; font-size: 0.8em; padding: 1px 6px; border: 1px solid var(-
 .tb-sep { flex: none; width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
 .tb-select { height: 32px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); font-size: 0.8rem; }
 .note-source { width: 100%; min-height: 50vh; border: 0; outline: none; resize: vertical; padding: 16px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.88rem; line-height: 1.6; background: transparent; border-radius: 0 0 var(--radius) var(--radius); }
-.note-prose { min-height: 50vh; padding: 16px 20px; outline: none; line-height: 1.65; overflow-wrap: anywhere; }
+.note-prose { min-height: 50vh; padding: 16px 20px; outline: none; line-height: 1.65; overflow-wrap: anywhere; word-break: break-word; }
+.note-prose a { overflow-wrap: anywhere; }
+@media (max-width: 640px) { .note-prose { padding: 14px; } }
 .note-prose > * + * { margin-top: 0.6em; }
 .note-prose h1, .note-prose h2, .note-prose h3 { margin-top: 1.1em; }
 .note-prose p { margin: 0; }
@@ -599,6 +604,8 @@ kbd { font: inherit; font-size: 0.8em; padding: 1px 6px; border: 1px solid var(-
 .qr-viewfinder { position: relative; width: 100%; aspect-ratio: 1; max-height: 60vh; border-radius: 16px; overflow: hidden; background: #000; }
 .qr-viewfinder video { width: 100%; height: 100%; object-fit: cover; display: block; }
 .qr-frame { position: absolute; inset: 18%; border: 3px solid rgba(255, 255, 255, 0.9); border-radius: 18px; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35); }
+.sync-log { list-style: none; margin: 0; padding: 8px 10px; max-height: 220px; overflow: auto; background: var(--surface-2); border-radius: 10px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.75rem; display: flex; flex-direction: column; gap: 2px; }
+.sync-log time { color: var(--text-2); }
 .sync-words { columns: 3; column-gap: 16px; margin: 0; padding-left: 28px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.88rem; }
 @media (max-width: 420px) { .sync-scan { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
 .or-divider { display: flex; align-items: center; gap: 10px; color: var(--text-2); font-size: 0.8rem; }
@@ -606,10 +613,25 @@ kbd { font: inherit; font-size: 0.8em; padding: 1px 6px; border: 1px solid var(-
 .qr-viewfinder { position: relative; width: 100%; aspect-ratio: 1; max-height: 60vh; border-radius: 16px; overflow: hidden; background: #000; }
 .qr-viewfinder video { width: 100%; height: 100%; object-fit: cover; display: block; }
 .qr-frame { position: absolute; inset: 18%; border: 3px solid rgba(255, 255, 255, 0.9); border-radius: 18px; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35); }
+.sync-log { list-style: none; margin: 0; padding: 8px 10px; max-height: 220px; overflow: auto; background: var(--surface-2); border-radius: 10px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.75rem; display: flex; flex-direction: column; gap: 2px; }
+.sync-log time { color: var(--text-2); }
 .sync-words { columns: 2; } }
 
 /* While a sheet is open, toasts move to the top so they never cover its inputs. */
 body:has(.sheet-backdrop) .toast { top: calc(16px + env(safe-area-inset-top)); bottom: auto; }
+
+/* iPhones zoom in when a field with text under 16px is tapped; keep fields at 16px on touch screens. */
+@media (pointer: coarse) {
+  input, select, textarea { font-size: max(16px, 1em) !important; }
+}
+
+.time-select { display: inline-flex; align-items: center; gap: 4px; }
+.time-select select { min-height: 36px; padding: 4px 6px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); font: inherit; color: inherit; }
+.time-select.compact select { border: 0; background: transparent; min-height: 30px; padding: 0 2px; font-size: 0.82rem; font-weight: 600; }
+.time-select select:disabled { opacity: 0.6; }
+.time-clear { border: 0; background: transparent; color: var(--text-2); cursor: pointer; width: 28px; height: 28px; border-radius: 50%; }
+.time-clear:hover { background: var(--surface-2); color: var(--text); }
+.chip-time-wrap { cursor: default; }
 
 .privacy-list { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 8px; }
 
@@ -776,11 +798,14 @@ kbd { font: inherit; font-size: 0.8em; padding: 1px 6px; border: 1px solid var(-
 .weekday-picker button[aria-pressed='true'] { background: var(--brand); border-color: var(--brand); color: #fff; }
 
 /* ---------- notes ---------- */
-.notes-layout { display: grid; grid-template-columns: 1fr; gap: 20px; max-width: 1200px; margin: 0 auto; }
+.notes-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; max-width: 1200px; margin: 0 auto; }
+/* Grid and flex children default to min-width: auto, which lets wide content (the toolbar row,
+   a long link) stretch the page past the screen, so phones zoom out. Let them shrink instead. */
+.notes-list, .notes-main, .note-pane, .note-editor, .note-prose { min-width: 0; }
 .notes-layout.has-note .notes-list { display: none; }
 .notes-layout:not(.has-note) .notes-main { display: none; }
 @media (min-width: 1000px) {
-  .notes-layout, .notes-layout.has-note { grid-template-columns: 300px 1fr; }
+  .notes-layout, .notes-layout.has-note { grid-template-columns: 300px minmax(0, 1fr); }
   .notes-layout .notes-list, .notes-layout.has-note .notes-list { display: block; }
   .notes-layout:not(.has-note) .notes-main { display: block; }
   .note-back { display: none; }
@@ -807,7 +832,9 @@ kbd { font: inherit; font-size: 0.8em; padding: 1px 6px; border: 1px solid var(-
 .tb-sep { flex: none; width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
 .tb-select { height: 32px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); font-size: 0.8rem; }
 .note-source { width: 100%; min-height: 50vh; border: 0; outline: none; resize: vertical; padding: 16px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.88rem; line-height: 1.6; background: transparent; border-radius: 0 0 var(--radius) var(--radius); }
-.note-prose { min-height: 50vh; padding: 16px 20px; outline: none; line-height: 1.65; overflow-wrap: anywhere; }
+.note-prose { min-height: 50vh; padding: 16px 20px; outline: none; line-height: 1.65; overflow-wrap: anywhere; word-break: break-word; }
+.note-prose a { overflow-wrap: anywhere; }
+@media (max-width: 640px) { .note-prose { padding: 14px; } }
 .note-prose > * + * { margin-top: 0.6em; }
 .note-prose h1, .note-prose h2, .note-prose h3 { margin-top: 1.1em; }
 .note-prose p { margin: 0; }
@@ -880,6 +907,8 @@ kbd { font: inherit; font-size: 0.8em; padding: 1px 6px; border: 1px solid var(-
 .qr-viewfinder { position: relative; width: 100%; aspect-ratio: 1; max-height: 60vh; border-radius: 16px; overflow: hidden; background: #000; }
 .qr-viewfinder video { width: 100%; height: 100%; object-fit: cover; display: block; }
 .qr-frame { position: absolute; inset: 18%; border: 3px solid rgba(255, 255, 255, 0.9); border-radius: 18px; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35); }
+.sync-log { list-style: none; margin: 0; padding: 8px 10px; max-height: 220px; overflow: auto; background: var(--surface-2); border-radius: 10px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.75rem; display: flex; flex-direction: column; gap: 2px; }
+.sync-log time { color: var(--text-2); }
 .sync-words { columns: 3; column-gap: 16px; margin: 0; padding-left: 28px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.88rem; }
 @media (max-width: 420px) { .sync-scan { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
 .or-divider { display: flex; align-items: center; gap: 10px; color: var(--text-2); font-size: 0.8rem; }
@@ -887,6 +916,8 @@ kbd { font: inherit; font-size: 0.8em; padding: 1px 6px; border: 1px solid var(-
 .qr-viewfinder { position: relative; width: 100%; aspect-ratio: 1; max-height: 60vh; border-radius: 16px; overflow: hidden; background: #000; }
 .qr-viewfinder video { width: 100%; height: 100%; object-fit: cover; display: block; }
 .qr-frame { position: absolute; inset: 18%; border: 3px solid rgba(255, 255, 255, 0.9); border-radius: 18px; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35); }
+.sync-log { list-style: none; margin: 0; padding: 8px 10px; max-height: 220px; overflow: auto; background: var(--surface-2); border-radius: 10px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.75rem; display: flex; flex-direction: column; gap: 2px; }
+.sync-log time { color: var(--text-2); }
 .sync-words { columns: 2; } }
 
 .toast { bottom: 24px; } }

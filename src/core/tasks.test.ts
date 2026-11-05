@@ -124,3 +124,14 @@ describe('quick add', () => {
     expect(q('Buy milk').title).toBe('Buy milk');
   });
 });
+
+describe('12-hour time display', () => {
+  it('formats stored 24-hour times with AM/PM', async () => {
+    const { formatTime, to12h, to24h } = await import('../components/tasks/format');
+    expect(['00:00', '00:30', '09:05', '12:00', '12:45', '13:00', '18:05', '23:59'].map(formatTime)).toEqual(['12:00 AM', '12:30 AM', '9:05 AM', '12:00 PM', '12:45 PM', '1:00 PM', '6:05 PM', '11:59 PM']);
+    for (let h = 0; h < 24; h++) {
+      const { hour, period } = to12h(h);
+      expect(to24h(hour, period)).toBe(h);
+    }
+  });
+});

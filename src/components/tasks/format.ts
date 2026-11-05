@@ -15,11 +15,15 @@ export function dueLabel(date: string, today: string, time?: string): { text: st
   return { text: `${format(parseDate(date), date.slice(0, 4) === today.slice(0, 4) ? 'MMM d' : 'MMM d, yyyy')}${t}`, tone: 'later' };
 }
 
-/** 24h "HH:mm" to the viewer's locale (e.g. 9:00 AM). */
+/** Stored 24-hour "HH:mm" shown as a 12-hour time with AM/PM (e.g. "18:05" → "6:05 PM"). */
 export function formatTime(hhmm: string): string {
   const [h, m] = hhmm.split(':').map(Number);
-  return new Date(2000, 0, 1, h, m).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  const { hour, period } = to12h(h);
+  return `${hour}:${String(m).padStart(2, '0')} ${period}`;
 }
+
+export const to12h = (h: number): { hour: number; period: 'AM' | 'PM' } => ({ hour: h % 12 === 0 ? 12 : h % 12, period: h < 12 ? 'AM' : 'PM' });
+export const to24h = (hour: number, period: 'AM' | 'PM') => (hour % 12) + (period === 'PM' ? 12 : 0);
 
 export const nowTime = () => {
   const d = new Date();

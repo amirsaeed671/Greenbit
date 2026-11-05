@@ -5,6 +5,7 @@ import { db } from '../db/db';
 import { repo, uid } from '../db/repo';
 import { taskRepo } from '../db/taskRepo';
 import { useUI } from '../store/ui';
+import { formatTime } from '../components/tasks/format';
 
 const FIRED = 'reminders:fired';
 const LAST = 'reminders:lastCheck';
@@ -58,7 +59,7 @@ async function fire(list: DueReminder[]) {
   const individual = list.slice(-MAX_INDIVIDUAL);
   const extra = list.length - individual.length;
   for (const r of individual) {
-    const shown = await show(r.title, `Reminder · ${r.atLocal.slice(11)}`, r.key, { taskId: r.taskId });
+    const shown = await show(r.title, `Reminder · ${formatTime(r.atLocal.slice(11))}`, r.key, { taskId: r.taskId });
     if (!shown || document.visibilityState === 'visible') toast(`⏰ ${r.title}`);
   }
   if (extra > 0) await show('Greenbit', `You missed ${extra} more reminder${extra > 1 ? 's' : ''} while away.`, 'greenbit-missed', {});

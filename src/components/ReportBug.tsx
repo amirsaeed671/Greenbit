@@ -18,7 +18,9 @@ export function bugReportUrl(): string {
     `- Notifications: ${notificationPermission()}`,
     `- Page: ${location.pathname}`,
   ].join('\n');
-  const body = `**What happened?**\n\n\n**Steps to reproduce**\n1. \n2. \n\n**What did you expect?**\n\n\n**Environment** (filled in automatically; no personal data)\n${env}\n`;
+  const sync = useSync.getState();
+  const activity = sync.enabled && sync.activity.length ? `\n**Recent sync activity**\n\`\`\`\n${sync.activity.slice(-15).map((e) => `${e.at.slice(11, 19)} ${e.what}`).join('\n')}\n\`\`\`\n` : '';
+  const body = `**What happened?**\n\n\n**Steps to reproduce**\n1. \n2. \n\n**What did you expect?**\n\n\n**Environment** (filled in automatically; no personal data)\n${env}\n${activity}`;
   const q = new URLSearchParams({ title: 'Bug: ', labels: 'bug', body });
   return `${REPO_URL}/issues/new?${q}`;
 }

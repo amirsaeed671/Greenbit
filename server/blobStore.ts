@@ -1,4 +1,4 @@
-import { BlobPreconditionFailedError, BlobError, del, get, put } from '@vercel/blob';
+import { BlobPreconditionFailedError, BlobError, del, get, head, put } from '@vercel/blob';
 import { Conflict, type BlobStore } from './relay.js';
 
 /** Vercel Blob (private store). Needs BLOB_READ_WRITE_TOKEN, which connecting the store to the project provides. */
@@ -24,7 +24,11 @@ export const vercelBlobStore: BlobStore = {
       });
       return { etag: r.etag };
     } catch (e) {
-      if (e instanceof BlobPreconditionFailedError || (e instanceof BlobError && /already exists/i.test(e.message))) throw new Conflict();
+      if (e instanceof BlobPreconditionFailedError || (e instanceof BlobError && /already exists/i.test(e.message))) {
+        // For diagnostics: what the store holds now (shows up in runtime logs next to the If-Match we got).
+        const cur = await head(path).catch(() => null);
+        throw new Conflict(cur?.etag);
+      }
       throw e;
     }
   },

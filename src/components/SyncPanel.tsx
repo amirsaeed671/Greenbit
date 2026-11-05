@@ -198,6 +198,25 @@ export function SyncPanel() {
       )}
       {mode === 'add' ? <AddDevice /> : <div><button className="btn primary" onClick={() => setMode('add')}>Add another device</button></div>}
       <details className="chart-table">
+        <summary>Sync activity</summary>
+        <div className="stack" style={{ marginTop: 8, gap: 6 }}>
+          <ol className="sync-log" aria-label="Recent sync activity">
+            {[...s.activity].reverse().slice(0, 20).map((e, i) => (
+              <li key={i}>
+                <time>{new Date(e.at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })}</time> {e.what}
+              </li>
+            ))}
+            {s.activity.length === 0 && <li className="muted">Nothing yet.</li>}
+          </ol>
+          <div>
+            <button className="btn small ghost" onClick={() => void navigator.clipboard.writeText(s.activity.map((e) => `${e.at} ${e.what}`).join('\n'))}>
+              Copy activity
+            </button>
+          </div>
+          <p className="muted small" style={{ margin: 0 }}>Technical details only (request types, results and version tags), never your data. Included in bug reports.</p>
+        </div>
+      </details>
+      <details className="chart-table">
         <summary>Stop syncing</summary>
         <div className="stack" style={{ marginTop: 8 }}>
           <p className="muted small" style={{ margin: 0 }}>Leaving keeps everything on this device and stops sharing changes. Other devices keep syncing with each other.</p>

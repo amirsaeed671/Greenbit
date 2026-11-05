@@ -9,6 +9,7 @@ import { notificationPermission, requestNotifications } from '../../reminders/sc
 import { formatLong } from '../format';
 import { Sheet } from '../Sheet';
 import { formatTime } from './format';
+import { TimeSelect } from '../TimeSelect';
 
 const WD = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const WD_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -110,7 +111,7 @@ export function TaskSheet({ task, projects, labels, onClose }: { task: Task | nu
             <span className="label">Due date</span>
             <span className="row">
               <input type="date" value={task.dueDate ?? ''} onChange={(e) => set({ dueDate: e.target.value || undefined, ...(e.target.value ? {} : { dueTime: undefined, recurrence: undefined }) })} />
-              {task.dueDate && <input type="time" aria-label="Due time" value={task.dueTime ?? ''} onChange={(e) => set({ dueTime: e.target.value || undefined })} />}
+              {task.dueDate && <TimeSelect label="Due time" value={task.dueTime} onChange={(v) => set({ dueTime: v })} />}
             </span>
           </label>
         </div>
@@ -203,7 +204,10 @@ export function TaskSheet({ task, projects, labels, onClose }: { task: Task | nu
                 ))}
               </select>
             ) : (
-              <input type="datetime-local" aria-label="Remind at" value={remAt} onChange={(e) => setRemAt(e.target.value)} />
+              <>
+                <input type="date" aria-label="Remind on" value={remAt.slice(0, 10)} onChange={(e) => setRemAt(e.target.value ? `${e.target.value}T${remAt.slice(11) || '09:00'}` : '')} />
+                <TimeSelect label="Remind at" allowClear={false} value={remAt.slice(11) || undefined} onChange={(v) => v && setRemAt(`${remAt.slice(0, 10) || today}T${v}`)} />
+              </>
             )}
             <button
               className="btn small"

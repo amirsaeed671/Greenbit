@@ -13,7 +13,11 @@ export interface StoredBlob {
   etag: string;
 }
 
-export class Conflict extends Error {}
+export class Conflict extends Error {
+  constructor(readonly current?: string) {
+    super('conflict');
+  }
+}
 
 export interface BlobStore {
   read(path: string, ifNoneMatch?: string): Promise<StoredBlob | 'not-modified' | null>;
@@ -37,7 +41,15 @@ async function chainPath(req: Request): Promise<string | null> {
   return m ? `greenbit-sync/v1/${await sha256Hex(m[1])}.json` : null;
 }
 
+/** One line per request for debugging: chain id prefix (a hash, not the key), method, status, etags. */
+const trace = (path: string, what: Record<string, unknown>) => console.log(JSON.stringify({ relay: path.slice(16, 24), ...what }));
+
 export async function handle(req: Request, store: BlobStore): Promise<Response> {
+  const res = await route(req, store);
+  return res;
+}
+
+async function route(req: Request, store: BlobStore): Promise<Response> {
   const path = await chainPath(req);
   if (!path) return json(401, { error: 'Missing or malformed sync key' });
 
@@ -45,6 +57,7 @@ export async function handle(req: Request, store: BlobStore): Promise<Response> 
     if (req.method === 'GET') {
       const ifNoneMatch = req.headers.get('if-none-match') ?? undefined;
       const r = await store.read(path, ifNoneMatch);
+      trace(path, { m: 'GET', s: r === 'not-modified' ? 304 : r ? 200 : 204, inm: ifNoneMatch ?? null, etag: r && r !== 'not-modified' ? r.etag : null });
       if (r === 'not-modified') return new Response(null, { status: 304, headers: { etag: ifNoneMatch!, 'cache-control': 'no-store' } });
       // Empty chain: 204 rather than 404, so browsers don't log it as an error.
       if (!r) return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } });
@@ -61,9 +74,13 @@ export async function handle(req: Request, store: BlobStore): Promise<Response> 
       const ifMatch = body.force === true ? '*' : typeof body.ifMatch === 'string' ? body.ifMatch : null;
       try {
         const { etag } = await store.write(path, body.data, ifMatch);
+        trace(path, { m: 'PUT', s: 200, ifMatch, etag, bytes: body.data.length });
         return json(200, { etag }, { etag });
       } catch (e) {
-        if (e instanceof Conflict) return json(412, { error: 'Changed on another device; pull and retry' });
+        if (e instanceof Conflict) {
+          trace(path, { m: 'PUT', s: 412, ifMatch, current: e.current ?? null });
+          return json(412, { error: 'Changed on another device; pull and retry', current: e.current ?? null });
+        }
         throw e;
       }
     }
@@ -91,7 +108,7 @@ export class MemoryStore implements BlobStore {
   }
   async write(path: string, text: string, ifMatch: string | null) {
     const cur = this.m.get(path);
-    if (ifMatch !== '*' && (ifMatch === null ? !!cur : cur?.etag !== ifMatch)) throw new Conflict();
+    if (ifMatch !== '*' && (ifMatch === null ? !!cur : cur?.etag !== ifMatch)) throw new Conflict(cur?.etag);
     const etag = `"e${++this.n}"`;
     this.m.set(path, { text, etag });
     return { etag };
