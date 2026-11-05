@@ -42,7 +42,7 @@ export default function Settings() {
   const doExport = async () => {
     const snap = await repo.snapshot();
     try {
-      await shareOrDownload(buildExport(snap.settings, snap.habits, snap.entries), exportFileName(today));
+      await shareOrDownload(buildExport(snap.settings, snap), exportFileName(today));
       await repo.updateSettings({ lastExportAt: new Date().toISOString() });
       showToast('Backup exported');
     } catch {
