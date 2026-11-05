@@ -49,6 +49,7 @@ async function chainPath(req: Request): Promise<string | null> {
 }
 
 /** One line per request for debugging: chain id prefix (a hash, not the key), method, status, etags. */
+// Only conflicts are logged (to diagnose sync problems); normal reads and writes leave no trace.
 const trace = (path: string, what: Record<string, unknown>) => console.log(JSON.stringify({ relay: path.slice(16, 24), ...what }));
 
 export async function handle(req: Request, store: BlobStore): Promise<Response> {
@@ -65,7 +66,6 @@ async function route(req: Request, store: BlobStore): Promise<Response> {
       const inm = req.headers.get('if-none-match');
       const ifNoneMatch = inm ? strongEtag(inm) : undefined;
       const r = await store.read(path, ifNoneMatch);
-      trace(path, { m: 'GET', s: r === 'not-modified' ? 304 : r ? 200 : 204, inm: ifNoneMatch ?? null, etag: r && r !== 'not-modified' ? r.etag : null });
       if (r === 'not-modified') return new Response(null, { status: 304, headers: { etag: ifNoneMatch!, 'cache-control': 'no-store' } });
       // Empty chain: 204 rather than 404, so browsers don't log it as an error.
       if (!r) return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } });
@@ -83,7 +83,6 @@ async function route(req: Request, store: BlobStore): Promise<Response> {
       const ifMatch = body.force === true ? '*' : typeof body.ifMatch === 'string' ? strongEtag(body.ifMatch) : null;
       try {
         const etag = strongEtag((await store.write(path, body.data, ifMatch)).etag);
-        trace(path, { m: 'PUT', s: 200, ifMatch, etag, bytes: body.data.length });
         return json(200, { etag }, { etag });
       } catch (e) {
         if (e instanceof Conflict) {

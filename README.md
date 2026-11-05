@@ -187,6 +187,8 @@ Limits: tombstones are forgotten after 60 days, so a device that stays offline l
 - **Your data stays on your devices**, in the browser's IndexedDB. There are no accounts.
 - **Sync is end-to-end encrypted**: the relay only ever stores ciphertext.
 - **No automatic crash reports.** The in-app **Report a bug** button opens a pre-filled GitHub issue with technical details only (version, browser, screen size, whether sync and notifications are on). Nothing is sent until you submit it.
+- **The relay knows almost nothing.** It sees an opaque chain id (a hash of a key derived from your sync code), the size of the encrypted blob and when it changes. It never sees your sync code, your encryption key or your data. Only failed (conflicting) writes are logged, for debugging.
+- **No third-party requests.** Fonts and every library are bundled with the app; nothing is loaded from a CDN.
 - Like any website, the host (Vercel) keeps standard short-lived request logs (IP address, time).
 
 ## Reminders: what to expect
@@ -196,6 +198,12 @@ Greenbit has no push server, so a browser can only show a reminder while Greenbi
 ## Deployment
 
 Live at **[greenbit-six.vercel.app](https://greenbit-six.vercel.app)**. The app is deployed on Vercel from this repository on every push. `vercel.json` holds the SPA rewrite and cache headers. The sync relay is a single Vercel Function (`api/sync.ts`) using a private Vercel Blob store, through the `BLOB_READ_WRITE_TOKEN` that connecting the store to the project provides. Without sync, the app is purely static: build and serve `dist/`.
+
+## License
+
+Greenbit is free and open source software, released under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0-only). You can use, study, modify and share it. If you run a modified version as a public service, you must share your source code with its users too.
+
+Copyright (C) 2026 Amir Ali
 
 ## Author
 

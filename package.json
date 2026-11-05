@@ -5,6 +5,9 @@
   "description": "Greenbit: a local-first habit garden PWA",
   "type": "module",
   "author": "Amir Ali <https://amir-ali.me>",
+  "license": "AGPL-3.0-only",
+  "repository": "github:amirsaeed671/Greenbit",
+  "homepage": "https://greenbit-six.vercel.app",
   "scripts": {
     "dev": "vite",
     "build": "npm run validate:quotes && tsc -b && vite build",

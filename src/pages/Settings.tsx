@@ -198,6 +198,10 @@ export default function Settings() {
           </a>
           . See more work at <a href={AUTHOR.url} target="_blank" rel="noopener noreferrer">amir-ali.me</a>.
         </p>
+        <p className="muted small">
+          Free and open source under the{' '}
+          <a href={`${REPO_URL}/blob/HEAD/LICENSE`} target="_blank" rel="noopener noreferrer">GNU AGPL v3.0</a>.
+        </p>
         <p className="muted small">Daily quotes come from public-domain translations of classic works, each with a named source.</p>
         <div className="row">
           <ReportBugLink className="btn">🐞 Report a bug</ReportBugLink>
