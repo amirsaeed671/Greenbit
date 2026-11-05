@@ -601,11 +601,13 @@ body:has(.sheet-backdrop) .toast { top: calc(16px + env(safe-area-inset-top)); b
 .privacy-list { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 8px; }
 
 .toast {
-  position: fixed; left: 50%; bottom: calc(var(--nav-h) + 16px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+  position: fixed; left: 50%; bottom: calc(var(--nav-h) + 84px + env(safe-area-inset-bottom)); transform: translateX(-50%); /* above the + button */
   background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 999px; z-index: 60; font-weight: 700;
-  display: flex; gap: 12px; align-items: center; max-width: calc(100% - 32px);
+  display: flex; gap: 12px; align-items: center;
+  /* Natural width (one line when it fits); with left: 50% the browser would otherwise only allow half the screen. */
+  width: max-content; max-width: calc(100vw - 32px);
 }
-.toast button { background: transparent; border: 0; color: var(--accent); font-weight: 800; cursor: pointer; }
+.toast button { background: transparent; border: 0; color: var(--accent); font-weight: 800; cursor: pointer; flex: none; padding: 4px 2px; }
 @media (min-width: 860px) { /* ---------- insights / charts ---------- */
 .filter-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .filter-row .segmented { flex-wrap: wrap; }
