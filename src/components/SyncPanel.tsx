@@ -1,7 +1,10 @@
 import { formatDistanceToNow } from 'date-fns';
 import QRCode from 'qrcode';
 import { useEffect, useState } from 'react';
-import { deriveKeys, newSeed, seedToLink, seedToWords, wordsToSeed } from '../sync/crypto';
+import { deriveKeys, linkToSeed, newSeed, seedToLink, seedToWords, wordsToSeed } from '../sync/crypto';
+import { QrScanner } from './QrScanner';
+import { useCallback } from 'react';
+import { useUI } from '../store/ui';
 import { deleteRemoteAndLeave, enableSync, getDeviceName, getSeed, leaveSync, renameDevice, repairSync, syncNow, useSync } from '../sync/engine';
 import { repo } from '../db/repo';
 
@@ -55,11 +58,42 @@ function AddDevice() {
   );
 }
 
+/** A scanned or pasted code: a Greenbit sync link (QR) or the 24 words. */
+export function parseSyncCode(text: string): Uint8Array {
+  const t = text.trim();
+  const fromLink = linkToSeed(t.includes('#') ? t.slice(t.indexOf('#')) : '');
+  if (fromLink) return fromLink;
+  if (/^https?:\/\//i.test(t)) throw new Error('That QR code isn’t a Greenbit sync code. Open Settings → Sync → Add another device on your other device and scan the code shown there.');
+  return wordsToSeed(t);
+}
+
 export function SyncPanel() {
   const s = useSync();
+  const showToast = useUI((st) => st.showToast);
   const [mode, setMode] = useState<'idle' | 'join' | 'add'>('idle');
   const [input, setInput] = useState('');
   const [err, setErr] = useState('');
+  const [scanning, setScanning] = useState(false);
+  const [joining, setJoining] = useState(false);
+  const join = async (seed: Uint8Array) => {
+    setJoining(true);
+    try {
+      await enableSync(seed);
+      setMode('idle');
+      showToast(`Joined sync chain ${useSync.getState().fingerprint ?? ''}`.trim());
+    } finally {
+      setJoining(false);
+    }
+  };
+  const onScan = useCallback((text: string) => {
+    setScanning(false);
+    setErr('');
+    try {
+      void join(parseSyncCode(text));
+    } catch (x) {
+      setErr((x as Error).message);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [name, setName] = useState('');
   const [me, setMe] = useState('');
   const [, tick] = useState(0);
@@ -83,26 +117,28 @@ export function SyncPanel() {
               e.preventDefault();
               setErr('');
               try {
-                const seed = /k=/.test(input) ? null : wordsToSeed(input);
-                if (!seed) {
-                  location.assign(input.trim());
-                  return;
-                }
-                await enableSync(seed);
-                setMode('idle');
+                await join(parseSyncCode(input));
               } catch (x) {
                 setErr((x as Error).message);
               }
             }}
           >
+            <div className="sync-scan">
+              <button type="button" className="btn primary" onClick={() => setScanning(true)} disabled={joining}>
+                📷 Scan QR code
+              </button>
+              <span className="muted small">On your other device: Settings → Sync → Add another device.</span>
+            </div>
+            <div className="or-divider" aria-hidden="true"><span>or type the code</span></div>
             <label className="field">
               <span className="label">Sync code</span>
               <textarea rows={3} value={input} onChange={(e) => setInput(e.target.value)} placeholder="Enter the 24 words from your other device, or paste its sync link" spellCheck={false} autoCapitalize="none" />
             </label>
             {err && <p role="alert" style={{ color: 'var(--danger)', fontWeight: 700, margin: 0 }}>{err}</p>}
+            <QrScanner open={scanning} onClose={() => setScanning(false)} onResult={onScan} />
             <p className="muted small" style={{ margin: 0 }}>This device’s data is merged with the chain; nothing is lost on either side.</p>
             <div className="row">
-              <button className="btn primary" type="submit" disabled={!input.trim()}>Join</button>
+              <button className="btn primary" type="submit" disabled={!input.trim() || joining}>{joining ? 'Joining…' : 'Join'}</button>
               <button className="btn ghost" type="button" onClick={() => setMode('idle')}>Cancel</button>
             </div>
           </form>

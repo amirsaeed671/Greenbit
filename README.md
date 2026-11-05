@@ -171,7 +171,7 @@ interface Entry { id; habitId; date; volume; note? }
 
 Sync follows the model Brave Sync uses: devices share a secret, and a relay stores data it cannot read.
 
-1. **A sync chain is 32 random bytes**, created on your device. You move it to another device as **24 words** (BIP39) or as a **QR code / link**. The link carries the secret in the URL fragment (`/sync#k=…`), which browsers never send to a server, and Greenbit removes it from the address bar right after reading it.
+1. **A sync chain is 32 random bytes**, created on your device. You move it to another device as **24 words** (BIP39) or as a **QR code / link**: scan it with the phone's camera app, or in Greenbit with **Settings → Sync → I have a sync code → Scan QR code** (or pick a photo of it). The link carries the secret in the URL fragment (`/sync#k=…`), which browsers never send to a server, and Greenbit removes it from the address bar right after reading it.
 2. **Two keys are derived** with HKDF-SHA256: an AES-256-GCM key that never leaves your devices, and a relay key that authorises access. The relay stores data under `SHA-256(relay key)`, so it never holds the key itself, and there are no accounts.
 3. **What's uploaded** is one blob per chain: every record, gzipped, then encrypted. The relay (`api/sync.ts`, backed by a private Vercel Blob store) only sees ciphertext and its size.
 4. **Merging** is per record using hybrid logical clock stamps: the newest edit of each task, note, habit or entry wins, and deletions are tombstones, so a delete on one device beats an older edit on another. Writes are conditional on the relay's ETag; if two devices write at once, the later one re-merges and retries, so nothing is overwritten.
