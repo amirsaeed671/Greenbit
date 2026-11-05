@@ -257,7 +257,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
   background: linear-gradient(135deg, var(--surface-2), var(--surface)); border: 1px solid var(--border);
 }
 .quote::before { content: '“'; position: absolute; top: -18px; left: 12px; font-family: var(--font-display); font-size: 4.5rem; color: var(--brand); opacity: 0.35; }
-.quote blockquote { margin: 0; font-family: var(--font-display); font-size: 1.12rem; line-height: 1.45; }
+.quote-close { position: absolute; top: 6px; right: 6px; color: var(--text-2); }
+.quote blockquote { margin: 0; padding-right: 28px; font-family: var(--font-display); font-size: 1.12rem; line-height: 1.45; }
 .quote figcaption { margin-top: 10px; font-size: 0.85rem; color: var(--text-2); }
 .quote figcaption strong { color: var(--text); }
 

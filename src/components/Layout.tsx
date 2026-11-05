@@ -205,6 +205,7 @@ export function Sidebar() {
 export function Layout() {
   const [drawer, setDrawer] = useState(false);
   const quickAddOpen = useUI((s) => s.quickAddOpen);
+  const today = useUI((s) => s.today);
   const setQuickAdd = useUI((s) => s.setQuickAdd);
   const { projects, labels, settings } = useTaskData();
   const location = useLocation();
@@ -267,7 +268,8 @@ export function Layout() {
         )}
       </AnimatePresence>
       <Sheet open={quickAddOpen} title="Add task" onClose={() => setQuickAdd(false)}>
-        <QuickAdd projects={projects} labels={labels} weekStartsOn={settings.weekStartsOn} defaults={projectMatch ? { projectId: projectMatch[1] } : {}} onClose={() => setQuickAdd(false)} closeOnAdd />
+        <QuickAdd projects={projects} labels={labels} weekStartsOn={settings.weekStartsOn} key={location.pathname}
+          defaults={projectMatch ? { projectId: projectMatch[1] } : location.pathname === '/' ? { dueDate: today } : {}} onClose={() => setQuickAdd(false)} closeOnAdd />
       </Sheet>
       <Drawer open={drawer} onClose={() => setDrawer(false)} />
       <SyncAlert />

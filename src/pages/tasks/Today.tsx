@@ -10,7 +10,6 @@ import { TaskSection, useTaskActions } from '../../components/tasks/TaskSection'
 import { TaskSheet } from '../../components/tasks/TaskSheet';
 import { Plant } from '../../components/Plant';
 import { EntrySheet } from '../../components/EntrySheet';
-import { QuoteCard } from '../../components/QuoteCard';
 import { BackupBanner } from '../../components/BackupBanner';
 import { formatLong, THIS_PERIOD } from '../../components/format';
 import { useUI } from '../../store/ui';
@@ -54,7 +53,6 @@ export default function Today() {
           </p>
         </div>
       </div>
-      <QuoteCard date={today} />
       <BackupBanner settings={settings} hasData={tasks.length + garden.entries.length > 0} today={today} />
 
       {overdue.length > 0 && (

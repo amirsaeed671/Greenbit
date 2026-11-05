@@ -9,6 +9,8 @@ import { formatLong } from '../components/format';
 import { useUI } from '../store/ui';
 import { SyncPanel } from '../components/SyncPanel';
 import { ReportBugLink, REPO_URL } from '../components/ReportBug';
+import { useSync } from '../sync/engine';
+import { setQuoteHidden, useQuoteHidden } from '../components/QuoteCard';
 import { notificationPermission, requestNotifications, sendTestNotification, type PermissionState } from '../reminders/scheduler';
 
 async function shareOrDownload(file: BackupFile, name: string) {
@@ -33,8 +35,64 @@ async function shareOrDownload(file: BackupFile, name: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+export const ERASE_PHRASE = 'erase all my data';
+/** Exact phrase, ignoring case and surrounding or repeated spaces. */
+export const matchesErasePhrase = (s: string) => s.trim().replace(/\s+/g, ' ').toLowerCase() === ERASE_PHRASE;
+
+function EraseAllSheet({ open, summary, onClose }: { open: boolean; summary: string; onClose: () => void }) {
+  const [typed, setTyped] = useState('');
+  const [busy, setBusy] = useState(false);
+  const showToast = useUI((s) => s.showToast);
+  const syncing = useSync((s) => s.enabled);
+  const ok = matchesErasePhrase(typed);
+  const close = () => {
+    setTyped('');
+    onClose();
+  };
+  return (
+    <Sheet open={open} title="Erase all data?" onClose={close}>
+      <form
+        className="stack"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!ok || busy) return;
+          setBusy(true);
+          void repo
+            .resetAll()
+            .then(() => showToast('All data erased'))
+            .finally(() => {
+              setBusy(false);
+              close();
+            });
+        }}
+      >
+        <p style={{ margin: 0 }}>
+          This permanently deletes every task, note, project and habit{summary}, plus your settings, from this device.
+          {syncing ? ' Sync is on, so they are erased on your other devices in the chain too.' : ''} It can’t be undone, so export a backup first if you might want them back.
+        </p>
+        <label className="field">
+          <span>
+            To confirm, type <strong>{ERASE_PHRASE}</strong>
+          </span>
+          <input value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" autoCapitalize="off" autoCorrect="off" spellCheck={false} placeholder={ERASE_PHRASE} aria-label={`Type ${ERASE_PHRASE} to confirm`} />
+        </label>
+        <div className="row" style={{ justifyContent: 'flex-end' }}>
+          <button type="button" className="btn ghost" onClick={close}>
+            Cancel
+          </button>
+          <button type="submit" className="btn danger" disabled={!ok || busy}>
+            {busy ? 'Erasing…' : 'Erase everything'}
+          </button>
+        </div>
+      </form>
+    </Sheet>
+  );
+}
+
 export default function Settings() {
   const { hash } = useLocation();
+  const [erasing, setErasing] = useState(false);
+  const quoteHidden = useQuoteHidden();
   // Links like /settings#sync land on that section.
   useEffect(() => {
     if (hash) document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' });
@@ -169,16 +227,13 @@ export default function Settings() {
         <h2>Danger zone</h2>
         <p className="muted">Erase all tasks, notes, habits and settings from this device.</p>
         <div>
-          <button
-            className="btn danger"
-            onClick={() => {
-              if (window.confirm(`Erase everything: tasks, notes, ${habits.length} habits and ${entries.length} entries? Export a backup first if you might want them back.`)) void repo.resetAll().then(() => showToast('All data erased'));
-            }}
-          >
+          <button className="btn danger" onClick={() => setErasing(true)}>
             Reset all data
           </button>
         </div>
       </section>
+
+      <EraseAllSheet open={erasing} summary={entries.length ? ` (including ${entries.length} habit ${entries.length === 1 ? 'entry' : 'entries'})` : ''} onClose={() => setErasing(false)} />
 
       <section className="card stack" aria-labelledby="about">
         <div className="row" style={{ gap: 12 }}>
@@ -198,6 +253,10 @@ export default function Settings() {
           </a>
           . See more work at <a href={AUTHOR.url} target="_blank" rel="noopener noreferrer">amir-ali.me</a>.
         </p>
+        <label className="row" style={{ gap: 10 }}>
+          <input type="checkbox" checked={quoteHidden === false} disabled={quoteHidden === undefined} onChange={(e) => void setQuoteHidden(!e.target.checked)} />
+          <span>Show the daily quote in the Garden</span>
+        </label>
         <p className="muted small">
           Free and open source under the{' '}
           <a href={`${REPO_URL}/blob/HEAD/LICENSE`} target="_blank" rel="noopener noreferrer">GNU AGPL v3.0</a>.
