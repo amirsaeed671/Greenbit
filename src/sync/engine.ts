@@ -18,7 +18,12 @@ interface SyncConfig {
 
 interface SyncStatus {
   enabled: boolean;
-  phase: 'off' | 'idle' | 'syncing' | 'error' | 'offline';
+  /** 'retrying': a sync failed and is being retried automatically (not shown as an error). */
+  phase: 'off' | 'idle' | 'syncing' | 'retrying' | 'error' | 'offline';
+  /** Consecutive failed sync runs. */
+  failures: number;
+  /** Automatic retries are used up (or the problem can't be fixed by retrying): ask the user. */
+  needsAttention: boolean;
   lastSyncedAt?: string;
   error?: string;
   fingerprint?: string;
@@ -26,7 +31,7 @@ interface SyncStatus {
   activity: SyncEvent[];
 }
 
-export const useSync = create<SyncStatus>(() => ({ enabled: false, phase: 'off', devices: {}, activity: [] }));
+export const useSync = create<SyncStatus>(() => ({ enabled: false, phase: 'off', devices: {}, activity: [], failures: 0, needsAttention: false }));
 
 const CONFIG = 'sync:config';
 const STATE = 'sync:state';
@@ -35,6 +40,7 @@ const ENDPOINT = '/api/sync';
 let keys: ChainKeys | null = null;
 let running: Promise<void> | null = null;
 let again = false;
+let againForce = false;
 
 /** Highest clock stamp stored locally (each synced table is indexed by stamp). */
 async function localMaxHlc(): Promise<string> {
@@ -114,7 +120,7 @@ function rawRequest(method: 'GET' | 'PUT' | 'DELETE', body?: unknown, etag?: str
     body: body ? JSON.stringify(body) : undefined,
     cache: 'no-store',
   }).catch(() => {
-    throw new SyncError('Couldn’t reach the sync relay. Retrying automatically.', true);
+    throw new SyncError('Couldn’t reach the sync relay.', true);
   });
 }
 
@@ -148,7 +154,7 @@ async function syncOnce(force = false): Promise<void> {
     const pending = forceThis || (await localMaxHlc()) > (saved.syncedHlc ?? '');
     // Ask "only if changed" when nothing local is pending; otherwise we need the full state to merge.
     const res = await request('GET', undefined, pending ? undefined : saved.etag);
-    if (res.status !== 200 && res.status !== 304 && res.status !== 204) throw new SyncError(`The sync relay had a problem (${res.status}). Retrying automatically.`, true);
+    if (res.status !== 200 && res.status !== 304 && res.status !== 204) throw new SyncError(`The sync relay had a problem (${res.status}).`, true);
 
     let remote: RemoteState | null = null;
     let etag: string | null = null;
@@ -204,7 +210,7 @@ async function syncOnce(force = false): Promise<void> {
         continue; // another device wrote first: wait a moment, pull and merge again
       }
       if (put.status === 413) throw new SyncError('Your data is too large to sync (over 4 MB compressed).', false);
-      if (!put.ok) throw new SyncError(`The sync relay had a problem (${put.status}). Retrying automatically.`, true);
+      if (!put.ok) throw new SyncError(`The sync relay had a problem (${put.status}).`, true);
       etag = ((await put.json()) as { etag: string }).etag;
     }
     // Everything up to the merged snapshot is now on the relay.
@@ -212,13 +218,29 @@ async function syncOnce(force = false): Promise<void> {
     useSync.setState({ lastSyncedAt: new Date().toISOString(), devices, error: undefined });
     return;
   }
-  throw new SyncError('Couldn’t save to the sync relay. Retrying automatically, or use Repair sync.', true);
+  throw new SyncError('Couldn’t save to the sync relay.', true);
 }
 
 let retryTimer = 0;
-let retryCount = 0;
-/** After a transient failure, really retry: 15 s, 30 s, 1 min, 2 min, then every 5 min. */
-export const retryDelay = (n: number) => Math.min(300000, 15000 * 2 ** n);
+
+/** Automatic retries before the user is asked to step in. */
+export const AUTO_RETRIES = 3;
+
+/**
+ * What to do after the n-th consecutive failed sync (n starts at 1):
+ * retry 1 is a normal sync after 5 s; retries 2 and 3 run Repair (merge and save) after 15 s and 30 s.
+ * If all three fail, alert the user once and keep repairing quietly: 1, 2, 4 min, then every 5 min.
+ */
+export function retryPlan(failures: number): { delay: number; repair: boolean; alert: boolean } {
+  const quick = [5000, 15000, 30000];
+  if (failures <= AUTO_RETRIES) return { delay: quick[failures - 1], repair: failures >= 2, alert: false };
+  return { delay: Math.min(300000, 60000 * 2 ** (failures - AUTO_RETRIES - 1)), repair: true, alert: failures === AUTO_RETRIES + 1 };
+}
+
+/** The user chose "Not now": hide the prompt until the next problem. */
+export function dismissSyncAlert() {
+  useSync.setState({ needsAttention: false });
+}
 
 let lastAttempt = 0;
 
@@ -226,7 +248,9 @@ let lastAttempt = 0;
 export function syncNow(force = false): Promise<void> {
   lastAttempt = Date.now();
   if (running) {
+    // Queue another run after this one; a queued Repair stays a Repair.
     again = true;
+    againForce ||= force;
     return running;
   }
   if (!navigator.onLine) {
@@ -239,19 +263,36 @@ export function syncNow(force = false): Promise<void> {
   const locked = (fn: () => Promise<void>) => (navigator.locks ? navigator.locks.request('greenbit-sync', fn) : fn());
   running = locked(() => syncOnce(force))
     .then(() => {
-      retryCount = 0;
-      useSync.setState({ phase: 'idle', error: undefined });
+      if (useSync.getState().failures) logSync('recovered');
+      useSync.setState({ phase: 'idle', error: undefined, failures: 0, needsAttention: false });
     })
     .catch((e: Error) => {
-      logSync(`error: ${e.message}`);
-      useSync.setState({ phase: 'error', error: e.message });
-      if (!(e instanceof SyncError) || e.retry) retryTimer = window.setTimeout(() => void syncNow(), retryDelay(retryCount++));
+      const failures = useSync.getState().failures + 1;
+      const retryable = !(e instanceof SyncError) || e.retry;
+      logSync(`error (${failures}): ${e.message}`);
+      if (!retryable) {
+        // Retrying or repairing won't help (wrong code, data too large): tell the user now.
+        useSync.setState({ phase: 'error', error: e.message, failures, needsAttention: true });
+        return;
+      }
+      const plan = retryPlan(failures);
+      const quiet = failures <= AUTO_RETRIES;
+      useSync.setState({
+        phase: quiet ? 'retrying' : 'error',
+        error: e.message,
+        failures,
+        needsAttention: plan.alert ? true : useSync.getState().needsAttention,
+      });
+      logSync(`retry in ${plan.delay / 1000}s${plan.repair ? ' (repair)' : ''}`);
+      retryTimer = window.setTimeout(() => void syncNow(plan.repair), plan.delay);
     })
     .finally(() => {
       running = null;
       if (again) {
+        const f = againForce;
         again = false;
-        void syncNow();
+        againForce = false;
+        void syncNow(f);
       }
     });
   return running;
@@ -261,7 +302,7 @@ export async function enableSync(seed: Uint8Array, deviceName = defaultDeviceNam
   await db.local.put({ key: CONFIG, value: { seed: b64u.enc(seed), deviceName, joinedAt: new Date().toISOString() } satisfies SyncConfig });
   await db.local.delete(STATE);
   keys = await deriveKeys(seed);
-  useSync.setState({ enabled: true, phase: 'idle', fingerprint: keys.fingerprint, error: undefined, devices: {} });
+  useSync.setState({ enabled: true, phase: 'idle', fingerprint: keys.fingerprint, error: undefined, devices: {}, failures: 0, needsAttention: false });
   await syncNow();
 }
 
@@ -286,7 +327,7 @@ export async function leaveSync() {
   window.clearTimeout(retryTimer);
   await db.local.bulkDelete([CONFIG, STATE]);
   keys = null;
-  useSync.setState({ enabled: false, phase: 'off', lastSyncedAt: undefined, error: undefined, fingerprint: undefined, devices: {} });
+  useSync.setState({ enabled: false, phase: 'off', lastSyncedAt: undefined, error: undefined, fingerprint: undefined, devices: {}, failures: 0, needsAttention: false });
 }
 
 /** Delete the encrypted copy from the relay, then leave. Devices still in the chain will upload it again. */

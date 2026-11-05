@@ -13,6 +13,7 @@ import { Sheet } from './Sheet';
 import { QuickAdd } from './tasks/QuickAdd';
 import { Toasts } from './Toasts';
 import { useSync } from '../sync/engine';
+import { SyncAlert } from './SyncAlert';
 import { IconBug, IconSync } from './Icons';
 import { ReportBugLink } from './ReportBug';
 
@@ -138,7 +139,7 @@ function NewProject({ onDone }: { onDone: () => void }) {
 function SyncBadge() {
   const s = useSync();
   if (!s.enabled) return null;
-  const label = { idle: 'Synced', syncing: 'Syncing…', error: 'Sync problem', offline: 'Offline', off: '' }[s.phase];
+  const label = { idle: 'Synced', syncing: s.failures ? 'Retrying…' : 'Syncing…', retrying: 'Retrying…', error: 'Sync problem', offline: 'Offline', off: '' }[s.phase];
   return (
     // A status shortcut, not a page: a plain Link so it never shows as selected alongside Settings.
     <Link to="/settings#sync" className="side-link sync-status" title={s.error} aria-label={`Sync status: ${label}. Open sync settings`}>
@@ -269,6 +270,7 @@ export function Layout() {
         <QuickAdd projects={projects} labels={labels} weekStartsOn={settings.weekStartsOn} defaults={projectMatch ? { projectId: projectMatch[1] } : {}} onClose={() => setQuickAdd(false)} closeOnAdd />
       </Sheet>
       <Drawer open={drawer} onClose={() => setDrawer(false)} />
+      <SyncAlert />
       <Celebration />
       <Toasts />
     </div>

@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { deriveKeys, linkToSeed, newSeed, open, seal, seedToLink, seedToWords, wordsToSeed } from './crypto';
 import { emptyState, mergeStates, type SyncState } from './merge';
-import { conflictBackoff, EVENT_GAP_MS, POLL_MS, retryDelay } from './engine';
+import { AUTO_RETRIES, conflictBackoff, EVENT_GAP_MS, POLL_MS, retryPlan } from './engine';
 
 const st = (tables: Partial<SyncState['tables']>, settings?: SyncState['settings']): SyncState => ({ ...emptyState(), tables: { ...emptyState().tables, ...tables }, settings });
 const task = (id: string, hlc: string, extra = {}) => ({ id, hlc, title: id, ...extra }) as never;
@@ -93,6 +93,15 @@ describe('sync polling', () => {
     expect(conflictBackoff(0, 1)).toBe(450);
     expect(conflictBackoff(3, 0.5)).toBe(2400);
     expect(conflictBackoff(10, 0.5)).toBe(4000);
-    expect([0, 1, 2, 3, 4, 5].map(retryDelay)).toEqual([15000, 30000, 60000, 120000, 240000, 300000]);
+  });
+  it('retries 3 times (the last two as Repair) before asking the user, once', () => {
+    expect(AUTO_RETRIES).toBe(3);
+    expect([1, 2, 3].map(retryPlan)).toEqual([
+      { delay: 5000, repair: false, alert: false },
+      { delay: 15000, repair: true, alert: false },
+      { delay: 30000, repair: true, alert: false },
+    ]);
+    expect(retryPlan(4)).toEqual({ delay: 60000, repair: true, alert: true });
+    expect([5, 6, 7, 8].map((n) => retryPlan(n))).toEqual([120000, 240000, 300000, 300000].map((delay) => ({ delay, repair: true, alert: false })));
   });
 });

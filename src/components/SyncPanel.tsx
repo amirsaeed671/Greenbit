@@ -5,7 +5,7 @@ import { deriveKeys, linkToSeed, newSeed, seedToLink, seedToWords, wordsToSeed }
 import { QrScanner } from './QrScanner';
 import { useCallback } from 'react';
 import { useUI } from '../store/ui';
-import { deleteRemoteAndLeave, enableSync, getDeviceName, getSeed, leaveSync, renameDevice, repairSync, syncNow, useSync } from '../sync/engine';
+import { AUTO_RETRIES, deleteRemoteAndLeave, enableSync, getDeviceName, getSeed, leaveSync, renameDevice, repairSync, syncNow, useSync } from '../sync/engine';
 import { repo } from '../db/repo';
 
 function AddDevice() {
@@ -157,15 +157,21 @@ export function SyncPanel() {
       <div className="row">
         <span className={`sync-dot ${s.phase}`} aria-hidden="true" />
         <span>
-          <strong>{{ idle: 'Synced', syncing: 'Syncing…', error: 'Sync problem', offline: 'Offline', off: 'Off' }[s.phase]}</strong>
+          <strong>{{ idle: 'Synced', syncing: s.failures ? 'Retrying…' : 'Syncing…', retrying: 'Retrying…', error: 'Sync problem', offline: 'Offline', off: 'Off' }[s.phase]}</strong>
           {s.lastSyncedAt && s.phase !== 'syncing' && <span className="muted"> · {formatDistanceToNow(new Date(s.lastSyncedAt), { addSuffix: true })}</span>}
         </span>
         <span className="spacer" />
         <button className="btn small" onClick={() => void syncNow()} disabled={s.phase === 'syncing'}>Sync now</button>
       </div>
+      {(s.phase === 'retrying' || (s.phase === 'syncing' && s.failures > 0)) && (
+        <p className="muted small" style={{ margin: 0 }} role="status">
+          Having trouble syncing ({s.error?.replace(/\.$/, '').toLowerCase()}). Retrying automatically, attempt {Math.min(s.failures, AUTO_RETRIES)} of {AUTO_RETRIES}
+          {s.failures >= 2 ? ', with repair' : ''}. Your changes are safe on this device.
+        </p>
+      )}
       {s.phase === 'error' && (
         <div className="banner small stack" role="alert" style={{ gap: 8, alignItems: 'stretch' }}>
-          <span>{s.error}</span>
+          <span>{s.error} Greenbit keeps retrying in the background.</span>
           <span className="muted">
             <strong>Repair sync</strong> downloads the synced copy, merges it with this device (keeping the newest version of every task, note and habit from both), and saves the result for all devices. Nothing on this device is lost.
           </span>
