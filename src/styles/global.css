@@ -176,6 +176,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .side-link.active { background: var(--brand-soft); color: var(--brand-strong); }
 .side-link.active svg { color: var(--brand); }
 .side-link .dot { margin: 0 5px; }
+.side-link.sync-status { color: var(--text-2); font-weight: 600; }
 .side-group { display: flex; align-items: center; justify-content: space-between; padding: 14px 10px 4px; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-2); }
 .icon-mini { border: 0; background: transparent; color: var(--text-2); font-size: 1.2rem; cursor: pointer; width: 28px; height: 28px; border-radius: 8px; }
 .icon-mini:hover { background: var(--surface-2); color: var(--text); }

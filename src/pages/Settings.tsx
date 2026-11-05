@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { buildExport, exportFileName, validateImport, type BackupFile } from '../core/backup';
 import { useGardenData } from '../db/hooks';
 import { repo } from '../db/repo';
@@ -34,6 +34,11 @@ async function shareOrDownload(file: BackupFile, name: string) {
 }
 
 export default function Settings() {
+  const { hash } = useLocation();
+  // Links like /settings#sync land on that section.
+  useEffect(() => {
+    if (hash) document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' });
+  }, [hash]);
   const { settings, habits, entries } = useGardenData();
   const today = useUI((s) => s.today);
   const showToast = useUI((s) => s.showToast);

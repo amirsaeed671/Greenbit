@@ -140,10 +140,11 @@ function SyncBadge() {
   if (!s.enabled) return null;
   const label = { idle: 'Synced', syncing: 'Syncing…', error: 'Sync problem', offline: 'Offline', off: '' }[s.phase];
   return (
-    <NavLink to="/settings#sync" className={cls} title={s.error}>
+    // A status shortcut, not a page: a plain Link so it never shows as selected alongside Settings.
+    <Link to="/settings#sync" className="side-link sync-status" title={s.error} aria-label={`Sync status: ${label}. Open sync settings`}>
       <IconSync /> <span>{label}</span>
       <i className={`sync-dot ${s.phase}`} aria-hidden="true" />
-    </NavLink>
+    </Link>
   );
 }
 
