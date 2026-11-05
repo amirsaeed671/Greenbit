@@ -1,7 +1,8 @@
 import { combinedDay } from './calendar';
 import { habitHistory } from './history';
 import { longestStreak } from './streaks';
-import type { Entry, Habit, WeekStart } from './types';
+import { goalProgress } from './goals';
+import type { Entry, Goal, Habit, WeekStart } from './types';
 
 export interface BadgeDef {
   id: string;
@@ -19,9 +20,11 @@ export const BADGES: BadgeDef[] = [
   { id: 'stretch-10', name: 'Golden harvest', description: 'Hit 10 stretch goals.', icon: '🌻' },
   { id: 'all-met-day', name: 'Full bed', description: 'Meet every applicable habit on one day (2+ habits).', icon: '🌷' },
   { id: 'comeback', name: 'Comeback', description: 'Meet a period right after missing one.', icon: '🌦️' },
+  { id: 'first-milestone', name: 'Signpost', description: 'Reach a goal milestone.', icon: '🪧' },
+  { id: 'goal-achieved', name: 'Harvest', description: 'Achieve a habit goal.', icon: '🏆' },
 ];
 
-export function earnedBadges(habits: Habit[], entries: Entry[], today: string, weekStartsOn: WeekStart = 1): Set<string> {
+export function earnedBadges(habits: Habit[], entries: Entry[], today: string, weekStartsOn: WeekStart = 1, goals: Goal[] = []): Set<string> {
   const earned = new Set<string>();
   if (entries.length) earned.add('first-entry');
 
@@ -53,6 +56,13 @@ export function earnedBadges(habits: Habit[], entries: Entry[], today: string, w
         break;
       }
     }
+  }
+  for (const g of goals) {
+    const h = habits.find((x) => x.id === g.habitId);
+    if (!h) continue;
+    const p = goalProgress(g, h, entries, today, weekStartsOn);
+    if (p.milestones.some((m) => m.achievedAt) || p.achievedAt) earned.add('first-milestone');
+    if (p.achievedAt) earned.add('goal-achieved');
   }
   return earned;
 }

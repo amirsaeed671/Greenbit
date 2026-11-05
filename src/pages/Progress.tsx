@@ -1,23 +1,36 @@
 import { useMemo } from 'react';
 import { BADGES, earnedBadges } from '../core/badges';
 import { plantState } from '../core/plant';
-import { GARDEN_STAGES, levelFor, totalSunlight } from '../core/xp';
+import { GARDEN_STAGES, GOAL_SUNLIGHT, levelFor, totalSunlight } from '../core/xp';
+import { achievements, goalProgress } from '../core/goals';
+import { GoalCard } from '../components/goals/GoalCard';
+import { formatLong } from '../components/format';
+import { Link } from 'react-router-dom';
 import { useGardenData } from '../db/hooks';
 import { Plant } from '../components/Plant';
 import { useUI } from '../store/ui';
 
 export default function Progress() {
-  const { habits, active, entries, settings } = useGardenData();
+  const { habits, active, entries, settings, goals } = useGardenData();
   const today = useUI((s) => s.today);
   const w = settings.weekStartsOn;
-  const { lvl, earned, plants } = useMemo(() => {
-    const sun = totalSunlight(habits, entries, today, w);
+  const { lvl, earned, plants, goalRows, wins, bonus } = useMemo(() => {
+    const goalRows = goals
+      .map((g) => ({ g, habit: habits.find((h) => h.id === g.habitId) }))
+      .filter((x) => x.habit && !x.habit.archivedAt)
+      .map(({ g, habit }) => ({ habit: habit!, p: goalProgress(g, habit!, entries, today, w) }));
+    const wins = achievements(goalRows);
+    const bonus = wins.reduce((s, a) => s + (a.final ? GOAL_SUNLIGHT.goal : GOAL_SUNLIGHT.milestone), 0);
     return {
-      lvl: levelFor(sun),
-      earned: earnedBadges(habits, entries, today, w),
+      lvl: levelFor(totalSunlight(habits, entries, today, w) + bonus),
+      earned: earnedBadges(habits, entries, today, w, goals),
       plants: active.map((h) => ({ h, s: plantState(h, entries, today, w) })),
+      goalRows,
+      wins,
+      bonus,
     };
-  }, [habits, active, entries, today, w]);
+  }, [habits, active, entries, today, w, goals]);
+  const activeGoals = goalRows.filter((r) => r.p.status === 'active' || r.p.status === 'upcoming');
 
   return (
     <div className="page stack">
@@ -33,7 +46,8 @@ export default function Progress() {
           <div className="fill tier-stretch" style={{ width: `${lvl.progress * 100}%` }} />
         </div>
         <p className="muted small">
-          {lvl.nextAt - lvl.sunlight} more sunlight to level {lvl.level + 1}. Each period earns sunlight once for the best tier you reach: below 1 · minimum 10 · target 15 · stretch 25.
+          {lvl.nextAt - lvl.sunlight} more sunlight to level {lvl.level + 1}. Each period earns sunlight once for the best tier you reach: below 1 · minimum 10 · target 15 · stretch 25. Milestones add {GOAL_SUNLIGHT.milestone} and finished goals {GOAL_SUNLIGHT.goal}
+          {bonus ? ` (${bonus} so far)` : ''}.
         </p>
         <ol className="row small muted" style={{ listStyle: 'none', padding: 0, margin: 0, gap: 6 }} aria-label="Garden stages">
           {GARDEN_STAGES.map((s) => (
@@ -58,6 +72,36 @@ export default function Progress() {
           </div>
         </section>
       )}
+
+      <section className="card stack">
+        <h2 style={{ margin: 0 }}>Goals & milestones</h2>
+        {goalRows.length === 0 && (
+          <p className="muted small" style={{ margin: 0 }}>
+            No goals yet. Open a habit from the <Link to="/habits">garden</Link> and add one, like a total to reach or a streak to build, with milestones on the way.
+          </p>
+        )}
+        {activeGoals.map(({ p, habit }) => (
+          <GoalCard key={p.goal.id} p={p} habit={habit} showHabit />
+        ))}
+        {wins.length > 0 && (
+          <>
+            <h3 style={{ margin: '8px 0 0' }}>Reached</h3>
+            <ol className="timeline">
+              {wins.slice(0, 20).map((a, i) => (
+                <li key={i} className={a.final ? 'final' : ''}>
+                  <span className="tl-dot" aria-hidden="true">{a.final ? '🏆' : '◆'}</span>
+                  <div>
+                    <strong>{a.final ? `${a.goal.title}` : `${a.label}${a.goal.kind === 'total' ? ` ${a.habit.unit}` : ''}`}</strong>
+                    <div className="muted small">
+                      {a.final ? 'Goal achieved' : a.goal.title} · {a.habit.name} · {formatLong(a.date)}
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </>
+        )}
+      </section>
 
       <section>
         <h2>Badges</h2>

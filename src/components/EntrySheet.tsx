@@ -3,6 +3,9 @@ import { periodOf } from '../core/periods';
 import type { Entry, Habit, WeekStart } from '../core/types';
 import { tierForVolume, tierIndex, volumeForPeriod } from '../core/volume';
 import { repo } from '../db/repo';
+import { goalProgress } from '../core/goals';
+import { useTable } from '../db/hooks';
+import type { Goal } from '../core/types';
 import { useUI } from '../store/ui';
 import { IconMinus, IconPlus } from './Icons';
 import { Sheet } from './Sheet';
@@ -27,6 +30,7 @@ export function EntrySheet({ habit, date: initialDate, entries, weekStartsOn, on
   const [date, setDate] = useState(initialDate);
   const [editing, setEditing] = useState<{ id: string; volume: string } | null>(null);
   const [error, setError] = useState('');
+  const goals = useTable<Goal>('goals') ?? [];
 
   useEffect(() => {
     setAmount('1');
@@ -53,7 +57,20 @@ export function EntrySheet({ habit, date: initialDate, entries, weekStartsOn, on
     await repo.addEntry({ habitId: habit.id, date, volume: n, note: note.trim() || undefined });
     const tb = tierForVolume(before, habit);
     const ta = tierForVolume(before + n, habit);
-    if (tierIndex(ta) > tierIndex(tb) && (ta === 'minimum' || ta === 'target' || ta === 'stretch')) celebrate({ tier: ta, habitName: habit.name });
+    // Goals: compare reached milestones before and after this entry.
+    const after = [...entries, { id: 'new', habitId: habit.id, date, volume: n }];
+    let goalHit: string | null = null;
+    for (const g of goals.filter((x) => x.habitId === habit.id)) {
+      const b0 = goalProgress(g, habit, entries, today, weekStartsOn);
+      const b1 = goalProgress(g, habit, after, today, weekStartsOn);
+      if (!b0.achievedAt && b1.achievedAt) goalHit = `Goal achieved: ${g.title}`;
+      else if (!goalHit) {
+        const m = b1.milestones.find((x, i) => x.achievedAt && !b0.milestones[i].achievedAt);
+        if (m) goalHit = `Milestone ${m.value.toLocaleString()} of ${g.target.toLocaleString()}`;
+      }
+    }
+    if (goalHit) celebrate({ tier: 'stretch', habitName: habit.name, label: goalHit });
+    else if (tierIndex(ta) > tierIndex(tb) && (ta === 'minimum' || ta === 'target' || ta === 'stretch')) celebrate({ tier: ta, habitName: habit.name });
     else showToast(`Logged ${n} ${habit.unit}`);
     setAmount('1');
     setNote('');

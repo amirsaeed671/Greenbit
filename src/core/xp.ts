@@ -42,3 +42,6 @@ export function levelFor(sunlight: number): LevelInfo {
   const nextAt = levelThreshold(level + 1);
   return { level, sunlight, currentAt, nextAt, progress: (sunlight - currentAt) / (nextAt - currentAt), stage: gardenStage(level) };
 }
+
+/** Bonus sunlight for goals, derived like everything else: per milestone reached and per goal achieved. */
+export const GOAL_SUNLIGHT = { milestone: 40, goal: 100 } as const;

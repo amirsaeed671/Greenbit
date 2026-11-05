@@ -6,6 +6,8 @@ export interface Celebration {
   id: number;
   tier: Exclude<Tier, 'none' | 'below'>;
   habitName: string;
+  /** Overrides the default "Minimum met" style headline. */
+  label?: string;
 }
 
 export interface Toast {

@@ -10,12 +10,17 @@ import { EntrySheet } from '../components/EntrySheet';
 import { Plant } from '../components/Plant';
 import { formatLong, formatShort, plural } from '../components/format';
 import { useUI } from '../store/ui';
+import { goalProgress } from '../core/goals';
+import type { Goal } from '../core/types';
+import { GoalCard } from '../components/goals/GoalCard';
+import { GoalSheet } from '../components/goals/GoalSheet';
 
 export default function HabitDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const today = useUI((s) => s.today);
-  const { habits, entries, settings, loaded } = useGardenData();
+  const { habits, entries, settings, loaded, goals } = useGardenData();
+  const [goalSheet, setGoalSheet] = useState<{ goal?: Goal } | null>(null);
   const habit = habits.find((h) => h.id === id);
   const [entryDate, setEntryDate] = useState<string | null>(null);
   const w = settings.weekStartsOn;
@@ -68,6 +73,21 @@ export default function HabitDetail() {
         <div className="card stat"><div className="muted small">Met</div><div className="value">{met}/{closed || 0}</div></div>
         <div className="card stat"><div className="muted small">Sunlight earned</div><div className="value">☀️ {data.sunlight}</div></div>
       </div>
+
+      <section className="card stack">
+        <div className="row">
+          <h2 style={{ margin: 0 }}>Goals</h2>
+          <span className="spacer" />
+          <button className="btn small" onClick={() => setGoalSheet({})}>+ Add goal</button>
+        </div>
+        {goals.filter((g) => g.habitId === habit.id).length === 0 ? (
+          <p className="muted small" style={{ margin: 0 }}>Set a target to grow toward, like 1,000 {habit.unit}, a 30-{habit.frequency === 'daily' ? 'day' : habit.frequency === 'weekly' ? 'week' : 'month'} streak, or meeting the minimum 50 times, with milestones along the way.</p>
+        ) : (
+          goals
+            .filter((g) => g.habitId === habit.id)
+            .map((g) => <GoalCard key={g.id} p={goalProgress(g, habit, entries, today, w)} habit={habit} onEdit={() => setGoalSheet({ goal: g })} />)
+        )}
+      </section>
 
       <section className="card">
         <h2>Last {last12.length} {habit.frequency === 'daily' ? 'days' : habit.frequency === 'weekly' ? 'weeks' : 'months'}</h2>
@@ -127,6 +147,7 @@ export default function HabitDetail() {
         </button>
       </section>
 
+      <GoalSheet habit={habit} goal={goalSheet?.goal} open={!!goalSheet} onClose={() => setGoalSheet(null)} />
       <EntrySheet habit={entryDate ? habit : null} date={entryDate ?? today} entries={entries} weekStartsOn={w} onClose={() => setEntryDate(null)} />
     </div>
   );

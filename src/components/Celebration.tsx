@@ -22,7 +22,7 @@ export function Celebration() {
         {c && (
           <motion.div key={c.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <motion.div className="label" initial={reduce ? false : { y: 12, scale: 0.9 }} animate={{ y: 0, scale: 1 }}>
-              {LABEL[c.tier]}: {c.habitName}
+              {c.label ?? LABEL[c.tier]}: {c.habitName}
             </motion.div>
             {!reduce &&
               Array.from({ length: 18 }, (_, i) => {

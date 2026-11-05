@@ -10,6 +10,9 @@ import { Heatmap } from '../components/charts/Heatmap';
 import { LineChart } from '../components/charts/LineChart';
 import { formatLong, formatShort, plural } from '../components/format';
 import { useUI } from '../store/ui';
+import { goalProgress } from '../core/goals';
+import { GoalCard } from '../components/goals/GoalCard';
+import { GoalChart } from '../components/charts/GoalChart';
 
 const RANGES: { id: RangePreset; label: string }[] = [
   { id: '30d', label: '30 days' },
@@ -32,7 +35,7 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
 }
 
 export default function Insights() {
-  const { loaded, active, entries, settings } = useGardenData();
+  const { loaded, active, entries, settings, goals } = useGardenData();
   const today = useUI((s) => s.today);
   const [range, setRange] = useState<RangePreset>('90d');
   const [habitId, setHabitId] = useState<string>('all');
@@ -112,6 +115,35 @@ export default function Insights() {
         />
         <Stat label="Sunlight earned" value={`☀️ ${fmtNum(s.sunlight)}`} sub={range === 'all' ? 'all time' : `last ${rangeLabel}`} />
       </div>
+
+      {(() => {
+        const rows = goals
+          .filter((g) => selected.some((h) => h.id === g.habitId))
+          .map((g) => ({ habit: selected.find((h) => h.id === g.habitId)!, p: goalProgress(g, selected.find((h) => h.id === g.habitId)!, entries, today, w) }))
+          .sort((a, b) => Number(a.p.status === 'achieved') - Number(b.p.status === 'achieved'));
+        if (!rows.length) return null;
+        return (
+          <ChartCard
+            title="Goals"
+            subtitle="Progress since each goal started. Hairlines mark milestones and the goal; the grey line is an even pace to the deadline; dots are milestones reached."
+            table={
+              <table>
+                <thead><tr><th>Goal</th><th>Habit</th><th>Progress</th><th>Milestones reached</th><th>Status</th></tr></thead>
+                <tbody>{rows.map(({ p, habit }) => <tr key={p.goal.id}><td>{p.goal.title}</td><td>{habit.name}</td><td>{fmtNum(p.value)} / {fmtNum(p.goal.target)}</td><td>{p.milestones.filter((m) => m.achievedAt).map((m) => `${fmtNum(m.value)} (${formatShort(m.achievedAt!)})`).join(', ') || '—'}</td><td>{p.status}</td></tr>)}</tbody>
+              </table>
+            }
+          >
+            <div className="stack">
+              {rows.map(({ p, habit }) => (
+                <div key={p.goal.id} className="goal-insight">
+                  <GoalCard p={p} habit={habit} showHabit={!single} />
+                  <GoalChart p={p} unit={habit.unit} height={170} />
+                </div>
+              ))}
+            </div>
+          </ChartCard>
+        );
+      })()}
 
       <ChartCard
         title="Completion rate"
