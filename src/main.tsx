@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import { startReminderScheduler } from './reminders/scheduler';
+import { startSyncEngine } from './sync/engine';
 import { useUI } from './store/ui';
 import './styles/global.css';
 
@@ -22,6 +23,7 @@ try {
 }
 
 startReminderScheduler();
+startSyncEngine();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

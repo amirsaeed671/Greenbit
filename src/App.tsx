@@ -15,6 +15,7 @@ const HabitForm = lazy(() => import('./pages/HabitForm'));
 const Progress = lazy(() => import('./pages/Progress'));
 const Insights = lazy(() => import('./pages/Insights'));
 const Settings = lazy(() => import('./pages/Settings'));
+const SyncJoin = lazy(() => import('./pages/SyncJoin'));
 
 const s = (el: JSX.Element) => <Suspense fallback={null}>{el}</Suspense>;
 
@@ -52,6 +53,7 @@ export const routes = [
       { path: '/habits/:id', element: s(<HabitDetail />) },
       { path: '/habits/:id/edit', element: s(<HabitForm />) },
       { path: '/settings', element: s(<Settings />) },
+      { path: '/sync', element: s(<SyncJoin />) },
       // Old addresses from before tasks existed
       { path: '/calendar', element: <Navigate to="/habits/calendar" replace /> },
       { path: '/insights', element: <Navigate to="/habits/insights" replace /> },

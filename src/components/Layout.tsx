@@ -12,6 +12,8 @@ import { Credit, LogoMark } from './Logo';
 import { Sheet } from './Sheet';
 import { QuickAdd } from './tasks/QuickAdd';
 import { Toasts } from './Toasts';
+import { useSync } from '../sync/engine';
+import { IconSync } from './Icons';
 
 const MOBILE_TABS = [
   { to: '/', label: 'Today', Icon: IconToday, end: true },
@@ -71,6 +73,18 @@ function NewProject({ onDone }: { onDone: () => void }) {
   );
 }
 
+function SyncBadge() {
+  const s = useSync();
+  if (!s.enabled) return null;
+  const label = { idle: 'Synced', syncing: 'Syncing…', error: 'Sync problem', offline: 'Offline', off: '' }[s.phase];
+  return (
+    <NavLink to="/settings#sync" className={cls} title={s.error}>
+      <IconSync /> <span>{label}</span>
+      <i className={`sync-dot ${s.phase}`} aria-hidden="true" />
+    </NavLink>
+  );
+}
+
 export function Sidebar() {
   const { tasks, projects, labels } = useTaskData();
   const today = useUI((s) => s.today);
@@ -113,6 +127,7 @@ export function Sidebar() {
       ))}
       <div className="side-group" />
       <NavLink to="/settings" className={cls}><IconSettings /> <span>Settings</span></NavLink>
+      <SyncBadge />
       <Sheet open={newProject} title="New project" onClose={() => setNewProject(false)}>
         <NewProject onDone={() => setNewProject(false)} />
       </Sheet>

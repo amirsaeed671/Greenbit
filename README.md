@@ -6,8 +6,8 @@
 </p>
 
 <p align="center">
-  <strong>Grow habits like a garden.</strong><br>
-  A local-first, offline-ready habit tracker where every habit is a plant that grows with small, steady effort.
+  <strong>Your tasks, notes and habits, growing together.</strong><br>
+  A local-first, offline-ready productivity garden: Todoist-style tasks, Markdown notes, and habits that grow like plants, synced across your devices with end-to-end encryption.
 </p>
 
 <p align="center">
@@ -21,6 +21,12 @@
 ---
 
 <p align="center">
+  <img src="docs/screenshots/desktop-today.png" alt="Today view with overdue and due tasks, priorities and projects" width="780">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/mobile-quickadd.png" alt="Quick add parsing a sentence into date, recurrence, priority, project, label and reminder" width="260">
+  &nbsp;
   <img src="docs/screenshots/mobile-garden.png" alt="Garden screen on a phone" width="260">
   &nbsp;
   <img src="docs/screenshots/mobile-cal-combined.png" alt="Combined calendar on a phone" width="260">
@@ -28,7 +34,13 @@
 
 ## What is Greenbit?
 
-Greenbit is a Progressive Web App for building habits without accounts, servers or tracking. Everything you log stays in your browser's IndexedDB on your device. You install it like an app on iOS, Android or desktop, and it keeps working with no connection.
+Greenbit is a Progressive Web App for getting things done and building habits, without accounts or tracking. Everything lives in your browser's IndexedDB on your device. You install it like an app on iOS, Android or desktop, and it keeps working with no connection. Optional sync keeps several browsers in step, end-to-end encrypted, like Brave Sync.
+
+- **Tasks**, Todoist-style: projects, priorities P1–P4, labels, due dates and times, recurring tasks, reminders, and a natural-language quick add.
+- **Notes** in Markdown with a rich-text editor: headings, checklists, tables, syntax-highlighted code blocks and a raw source mode.
+- **Habits** that grow like plants, with goals, milestones, streaks and insights.
+
+### Habits
 
 Each habit gets three goals per period:
 
@@ -42,6 +54,22 @@ Habits can be **daily**, **weekly** or **monthly**. Log as many entries as you l
 
 ## Features
 
+### Tasks
+
+- ⚡ **Quick add with natural language** (press <kbd>Q</kbd> anywhere): `Pay rent every month on the 1st p1 #Home @bills at 9am !30m` fills in the title, recurrence, priority, project, label, time and a reminder, with each part highlighted as you type.
+- 📥 **Today, Upcoming, Inbox, projects and labels**. Overdue tasks surface on Today with one-click "Reschedule to today". Completing and deleting both offer Undo.
+- 🔁 **Recurring tasks** with Todoist semantics: `every` steps from the due date (and skips missed ones), `every!` counts from when you complete it. Supports weekdays, specific days, the Nth of the month (the 31st stays the last day in short months), intervals and end dates.
+- ⏰ **Reminders** before the due time or at a set time, shown as browser notifications with **Complete** and **Snooze 10 min** buttons.
+
+### Notes
+
+<p align="center"><img src="docs/screenshots/desktop-notes.png" alt="Note editor with a checklist, syntax-highlighted code block and table" width="720"></p>
+
+- 📝 **Rich-text editor that saves Markdown** (TipTap): headings, bold/italic/strike, links, lists, checklists, quotes, dividers, **GFM tables** and **code blocks with syntax highlighting** (15 languages). Toggle to raw Markdown at any time.
+- Search, pin and file notes under projects. Autosaves as you type.
+
+### Habits
+
 - 🌱 **Garden home**: one plant per habit that grows from seed → sprout → bud → bloom, with a current streak and a progress bar showing minimum / target / stretch for the current period.
 - ➕ **Quick-add stepper** with +1 / +5 / +10 presets, custom amounts, notes and backfill to any past date.
 - 📅 **Calendar** with two modes (your choice is remembered):
@@ -49,8 +77,12 @@ Habits can be **daily**, **weekly** or **monthly**. Log as many entries as you l
   - *Combined*: every habit in one view, with ✓ / `2/3` / ✗ per day and a colour for the average tier.
 - 🗓️ **Gentle rules**: an open period is never marked ✗ and never breaks your streak. Missed periods let plants wilt a little; they recover with the next good period.
 - 📊 **Insights**: analytics for all habits or one, over 30 days, 90 days, 12 months or all time. Completion-rate trend, volume against your minimum/target/stretch lines, completion by habit, how periods turned out, a consistency heatmap and your best weekdays. Every chart has hover/keyboard tooltips and a table view.
+- 🎯 **Goals and milestones**: a total to reach ("3,000 pages"), a streak to build or a number of periods to meet, with an optional deadline and pace tracking. Reaching a milestone triggers a celebration, appears on the Progress timeline and earns bonus sunlight.
 - ☀️ **Gamification**: sunlight per period (below 1 · minimum 10 · target 15 · stretch 25), levels on a `50 · n^1.5` curve, garden stages from *Patch of soil* to *Grove*, eight badges and petal celebrations when you cross a threshold.
 - 📜 **Daily quote** from public-domain translations of classic works (Marcus Aurelius, Seneca, Epictetus, Aristotle, William James and others), always with a named source.
+### Everywhere
+
+- 🔄 **End-to-end encrypted sync** across browsers and devices (see [How sync works](#how-sync-works)).
 - 💾 **Export / import** as a single JSON file, validated with `zod`, with *merge* or *replace* applied atomically in one transaction. A nudge appears if you haven't backed up in 14 days.
 - 📲 **PWA**: installable, works fully offline, self-hosted fonts, no network requests after load, auto-updating service worker.
 - 🌓 **Dark mode**, keyboard accessible, `prefers-reduced-motion` respected, usable from 360px wide.
@@ -84,20 +116,26 @@ npm run dev        # http://localhost:5173
 
 ### Stack
 
-React 18 · TypeScript · Vite · `vite-plugin-pwa` (Workbox) · Dexie (IndexedDB) · Zustand · date-fns · Framer Motion · zod · Vitest + Testing Library.
+React 18 · TypeScript · Vite · `vite-plugin-pwa` (Workbox) · Dexie (IndexedDB) · Zustand · TipTap + `@tiptap/markdown` · lowlight · date-fns · Framer Motion · zod · WebCrypto · `@scure/bip39` · Vercel Functions + Blob · Vitest + Testing Library.
 
 ### Project layout
 
 ```
 src/
   core/         Pure, framework-free logic with unit tests
-                (periods, volume tiers, status, streaks, calendar, analytics, xp, plant, badges, backup)
+                (tasks, recurrence, quick add, reminders, clocks, goals, periods, streaks,
+                 calendar, analytics, xp, plant, badges, backup)
+  sync/         Sync chain crypto, per-record merge, sync engine
+  reminders/    Notification scheduler
   data/         quotes.json, plant species
   db/           Dexie schema, repository (CRUD, import, reset), live-query hooks
   store/        Zustand UI state (today, calendar cursor, celebrations, toasts)
   components/   Plant, QuoteCard, Sheet, EntrySheet, MonthGrid, ThresholdBar…
     charts/     Dependency-free SVG charts: line, column, bar list, heatmap
-  pages/        Garden, Calendar, Insights, HabitDetail, HabitForm, Progress, Settings
+  pages/        tasks/ (Today, Upcoming, project views), Notes, Garden, Calendar,
+                Insights, HabitDetail, HabitForm, Progress, Settings, SyncJoin
+server/         Sync relay (pure handler + Vercel Blob store), with tests
+api/            Vercel Function entry for the relay
   styles/       Design tokens (light + dark) and global styles
 scripts/        validate-quotes.ts
 brand/          Logo sources and icon generator
@@ -105,7 +143,7 @@ brand/          Logo sources and icon generator
 
 ### Data model
 
-Only **habits**, **entries** and **settings** are stored. Dates are local `YYYY-MM-DD` strings, never UTC timestamps, so time zones and DST can't shift a day.
+Only source records are stored: **tasks, projects, labels, notes, habits, habit entries, goals** and **settings**. Each carries a clock stamp (`hlc`) and, once deleted, a tombstone (`deletedAt`), which is what makes sync merges safe. Dates are local `YYYY-MM-DD` strings, never UTC timestamps, so time zones and DST can't shift a day.
 
 ```ts
 interface Habit { id; name; unit; frequency: 'daily' | 'weekly' | 'monthly';
@@ -129,9 +167,25 @@ interface Entry { id; habitId; date; volume; note? }
 
 > **Human review needed before release.** The quotes were transcribed from well-known public-domain translations without being machine-checked against the source texts. Each one has a precise reference to make that check quick.
 
+## How sync works
+
+Sync follows the model Brave Sync uses: devices share a secret, and a relay stores data it cannot read.
+
+1. **A sync chain is 32 random bytes**, created on your device. You move it to another device as **24 words** (BIP39) or as a **QR code / link**. The link carries the secret in the URL fragment (`/sync#k=…`), which browsers never send to a server, and Greenbit removes it from the address bar right after reading it.
+2. **Two keys are derived** with HKDF-SHA256: an AES-256-GCM key that never leaves your devices, and a relay key that authorises access. The relay stores data under `SHA-256(relay key)`, so it never holds the key itself, and there are no accounts.
+3. **What's uploaded** is one blob per chain: every record, gzipped, then encrypted. The relay (`api/sync.ts`, backed by a private Vercel Blob store) only sees ciphertext and its size.
+4. **Merging** is per record using hybrid logical clock stamps: the newest edit of each task, note, habit or entry wins, and deletions are tombstones, so a delete on one device beats an older edit on another. Writes are conditional on the relay's ETag; if two devices write at once, the later one re-merges and retries, so nothing is overwritten.
+5. **When it syncs:** on open, a few seconds after an edit, when the tab regains focus or comes back online, and every 5 minutes while open. Pending changes are worked out from the data itself, so an edit is never lost by closing a tab quickly.
+
+Limits: tombstones are forgotten after 60 days, so a device that stays offline longer than that could bring back something you deleted. Each chain is capped at 4 MB compressed. Anyone with your 24 words or link can read and change your synced data: treat it like a password.
+
+## Reminders: what to expect
+
+Greenbit has no push server, so a browser can only show a reminder while Greenbit is open or running in a background tab. Reminders that come due while it's fully closed appear as soon as you open it again. On iPhone and iPad, web notifications require adding Greenbit to the Home Screen first.
+
 ## Deployment
 
-Live at **[greenbit-six.vercel.app](https://greenbit-six.vercel.app)**. The app is a static site, deployed on Vercel from this repository on every push (`vercel.json` holds the SPA rewrite and cache headers for the service worker). Any static host works: build and serve `dist/`.
+Live at **[greenbit-six.vercel.app](https://greenbit-six.vercel.app)**. The app is deployed on Vercel from this repository on every push. `vercel.json` holds the SPA rewrite and cache headers. The sync relay is a single Vercel Function (`api/sync.ts`) using a private Vercel Blob store, through the `BLOB_READ_WRITE_TOKEN` that connecting the store to the project provides. Without sync, the app is purely static: build and serve `dist/`.
 
 ## Author
 

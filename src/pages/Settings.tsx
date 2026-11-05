@@ -7,6 +7,7 @@ import { AUTHOR, LogoMark } from '../components/Logo';
 import { Sheet } from '../components/Sheet';
 import { formatLong } from '../components/format';
 import { useUI } from '../store/ui';
+import { SyncPanel } from '../components/SyncPanel';
 import { notificationPermission, requestNotifications, sendTestNotification, type PermissionState } from '../reminders/scheduler';
 
 async function shareOrDownload(file: BackupFile, name: string) {
@@ -96,6 +97,11 @@ export default function Settings() {
             <button aria-pressed={settings.calendarMode === 'combined'} onClick={() => void repo.updateSettings({ calendarMode: 'combined' })}>Combined</button>
           </div>
         </div>
+      </section>
+
+      <section className="card stack" id="sync">
+        <h2 style={{ margin: 0 }}>Sync</h2>
+        <SyncPanel />
       </section>
 
       <section className="card stack" id="reminders">
