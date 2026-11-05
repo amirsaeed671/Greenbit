@@ -5,6 +5,7 @@ import type { Label, Priority, Project, Reminder, WeekStart } from '../../core/t
 import { uid } from '../../db/repo';
 import { taskRepo } from '../../db/taskRepo';
 import { useUI } from '../../store/ui';
+import { notificationPermission, requestNotifications } from '../../reminders/scheduler';
 import { dueLabel } from './format';
 
 export interface QuickAddDefaults {
@@ -96,6 +97,7 @@ export function QuickAdd({ projects, labels, weekStartsOn, defaults = {}, onClos
       reminders,
       createdAt: today,
     });
+    if (reminders.length && notificationPermission() === 'default') void requestNotifications();
     if (parsed.remindMinutesBefore !== undefined && !dueTime) showToast('Reminder skipped: add a time to remind before it');
     setText('');
     setDescription('');

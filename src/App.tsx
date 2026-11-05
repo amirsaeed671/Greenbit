@@ -7,6 +7,7 @@ import { useUI } from './store/ui';
 const Upcoming = lazy(() => import('./pages/tasks/Upcoming'));
 const ProjectView = lazy(() => import('./pages/tasks/ProjectView'));
 const Browse = lazy(() => import('./pages/Browse'));
+const Notes = lazy(() => import('./pages/Notes'));
 const Garden = lazy(() => import('./pages/Garden'));
 const CalendarPage = lazy(() => import('./pages/CalendarPage'));
 const HabitDetail = lazy(() => import('./pages/HabitDetail'));
@@ -36,6 +37,8 @@ export const routes = [
       { path: '/projects/:id', element: s(<ProjectView kind="project" />) },
       { path: '/labels/:id', element: s(<ProjectView kind="label" />) },
       { path: '/browse', element: s(<Browse />) },
+      { path: '/notes', element: s(<Notes />) },
+      { path: '/notes/:id', element: s(<Notes />) },
       {
         element: <HabitsShell />,
         children: [

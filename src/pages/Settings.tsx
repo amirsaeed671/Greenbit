@@ -7,6 +7,7 @@ import { AUTHOR, LogoMark } from '../components/Logo';
 import { Sheet } from '../components/Sheet';
 import { formatLong } from '../components/format';
 import { useUI } from '../store/ui';
+import { notificationPermission, requestNotifications, sendTestNotification, type PermissionState } from '../reminders/scheduler';
 
 async function shareOrDownload(file: BackupFile, name: string) {
   const blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' });
@@ -38,6 +39,9 @@ export default function Settings() {
   const [pending, setPending] = useState<BackupFile | null>(null);
   const [importError, setImportError] = useState('');
   const archived = habits.filter((h) => h.archivedAt);
+  const [perm, setPerm] = useState<PermissionState>(notificationPermission());
+  const installed = typeof window !== 'undefined' && window.matchMedia?.('(display-mode: standalone)').matches;
+  const ios = typeof navigator !== 'undefined' && /iPhone|iPad|iPod/.test(navigator.userAgent);
 
   const doExport = async () => {
     const snap = await repo.snapshot();
@@ -94,10 +98,36 @@ export default function Settings() {
         </div>
       </section>
 
+      <section className="card stack" id="reminders">
+        <h2>Reminders</h2>
+        <p className="muted">
+          Task reminders show as notifications on this device{' '}
+          <strong>while Greenbit is open or running in a background tab</strong>. Greenbit has no server, so it can’t wake a closed browser. Reminders that come due while it’s closed appear as soon as you open it again.
+        </p>
+        {ios && !installed && <p className="banner small">On iPhone and iPad, notifications only work after you add Greenbit to your Home Screen (Share → Add to Home Screen).</p>}
+        <div className="row">
+          <span>
+            Notifications: <strong>{{ granted: 'On', denied: 'Blocked', default: 'Not set up', unsupported: 'Not supported here' }[perm]}</strong>
+          </span>
+          <span className="spacer" />
+          {perm === 'default' && (
+            <button className="btn primary" onClick={async () => setPerm(await requestNotifications())}>
+              Turn on notifications
+            </button>
+          )}
+          {perm === 'granted' && (
+            <button className="btn" onClick={() => void sendTestNotification()}>
+              Send a test
+            </button>
+          )}
+        </div>
+        {perm === 'denied' && <p className="muted small">Your browser is blocking notifications for this site. Allow them in the browser’s site settings, then reload. Reminders will still show inside Greenbit.</p>}
+      </section>
+
       <section className="card stack" id="backup">
         <h2>Backup</h2>
         <p className="muted">
-          Greenbit keeps everything on this device, with no accounts and no servers. Browsers (especially iOS Safari) can clear site data, so export a backup now and then.
+          Greenbit keeps your tasks, notes and habits on this device, with no accounts. Browsers (especially iOS Safari) can clear site data, so export a backup now and then.
           {settings.lastExportAt ? ` Last export: ${formatLong(settings.lastExportAt.slice(0, 10))}.` : ' You haven’t exported yet.'}
         </p>
         <div className="row">
@@ -125,12 +155,12 @@ export default function Settings() {
 
       <section className="card stack">
         <h2>Danger zone</h2>
-        <p className="muted">Erase all habits, entries and settings from this device.</p>
+        <p className="muted">Erase all tasks, notes, habits and settings from this device.</p>
         <div>
           <button
             className="btn danger"
             onClick={() => {
-              if (window.confirm(`Erase ${habits.length} habits and ${entries.length} entries? Export a backup first if you might want them back.`)) void repo.resetAll().then(() => showToast('All data erased'));
+              if (window.confirm(`Erase everything: tasks, notes, ${habits.length} habits and ${entries.length} entries? Export a backup first if you might want them back.`)) void repo.resetAll().then(() => showToast('All data erased'));
             }}
           >
             Reset all data
@@ -147,7 +177,7 @@ export default function Settings() {
           </div>
         </div>
         <p>
-          Greenbit is a local-first habit garden. Every habit is a plant that grows with small, steady effort. Works fully offline, with no tracking and no accounts.
+          Greenbit is a local-first home for your tasks, notes and habits. Every habit is a plant that grows with small, steady effort. Works fully offline, with no tracking and no accounts.
         </p>
         <p>
           Designed and built by{' '}
@@ -163,7 +193,7 @@ export default function Settings() {
         {pending && (
           <div className="stack">
             <p>
-              This backup contains <strong>{pending.habits.length.toLocaleString()} habits</strong> and <strong>{pending.entries.length.toLocaleString()} entries</strong>, exported {formatLong(pending.exportedAt.slice(0, 10))}.
+              This backup contains <strong>{pending.tasks.length.toLocaleString()} tasks</strong>, <strong>{pending.projects.length} projects</strong>, <strong>{pending.notes.length} notes</strong>, <strong>{pending.habits.length} habits</strong> and <strong>{pending.entries.length.toLocaleString()} habit entries</strong>, exported {formatLong(pending.exportedAt.slice(0, 10))}.
             </p>
             <p className="muted small">
               <strong>Merge</strong> adds anything missing and keeps the most recently edited version of anything in both. <strong>Replace</strong> erases this device first.

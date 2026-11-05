@@ -5,6 +5,7 @@ import { colorHex } from '../../data/colors';
 import { uid } from '../../db/repo';
 import { taskRepo } from '../../db/taskRepo';
 import { useUI } from '../../store/ui';
+import { notificationPermission, requestNotifications } from '../../reminders/scheduler';
 import { formatLong } from '../format';
 import { Sheet } from '../Sheet';
 import { formatTime } from './format';
@@ -198,6 +199,8 @@ export function TaskSheet({ task, projects, labels, onClose }: { task: Task | nu
                 const r: Reminder = remKind === 'relative' ? { id: uid(), type: 'relative', minutesBefore: remBefore } : { id: uid(), type: 'absolute', at: remAt.slice(0, 16) };
                 set({ reminders: [...task.reminders, r] });
                 setRemAt('');
+                if (notificationPermission() === 'default') void requestNotifications();
+                else if (notificationPermission() === 'denied') showToast('Notifications are blocked in this browser; reminders will show inside Greenbit only');
               }}
             >
               Add reminder
