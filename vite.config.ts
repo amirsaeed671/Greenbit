@@ -11,9 +11,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'favicon.ico', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Greenbit: Habit Garden',
+        name: 'Greenbit',
         short_name: 'Greenbit',
-        description: 'Grow habits like a garden. Local-first, private, works offline.',
+        description: 'Tasks, notes and habits. Local-first, works offline, end-to-end encrypted sync.',
         theme_color: '#2A7F52',
         background_color: '#F6F3EC',
         display: 'standalone',
