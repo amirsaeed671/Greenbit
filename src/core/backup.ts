@@ -47,6 +47,7 @@ const recurrenceSchema = z.object({
   freq: z.enum(['daily', 'weekly', 'monthly', 'yearly']),
   interval: z.number().int().positive(),
   byWeekday: z.array(z.number().int().min(0).max(6)).optional(),
+  byMonthDay: z.number().int().min(1).max(31).optional(),
   fromCompletion: z.boolean().optional(),
   until: dateStr.optional(),
 });

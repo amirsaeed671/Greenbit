@@ -74,6 +74,7 @@ export interface Recurrence {
   freq: RecurrenceFreq;
   interval: number; // every N units
   byWeekday?: number[]; // weekly only, 0 = Sunday
+  byMonthDay?: number; // monthly only; kept so the 31st stays the 31st (or month end)
   /** Todoist's "every!": next due counts from the completion date, not the old due date. */
   fromCompletion?: boolean;
   until?: string;

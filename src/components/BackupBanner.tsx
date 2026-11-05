@@ -13,7 +13,7 @@ export function BackupBanner({ settings, hasData, today }: { settings: Settings;
     <div className="banner" role="note">
       <span aria-hidden="true">🧺</span>
       <span style={{ flex: 1, minWidth: 200 }}>
-        {settings.lastExportAt ? 'It’s been a while since your last backup.' : 'Your garden lives only on this device.'} Export a copy to keep it safe.
+        {settings.lastExportAt ? 'It’s been a while since your last backup.' : 'Your tasks, notes and habits live only on this device.'} Export a copy to keep it safe.
       </span>
       <Link className="btn small primary" to="/settings#backup">
         Back up

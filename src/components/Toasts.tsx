@@ -3,6 +3,7 @@ import { useUI } from '../store/ui';
 
 export function Toasts() {
   const toast = useUI((s) => s.toast);
+  const clear = () => useUI.setState({ toast: null });
   const {
     needRefresh: [needRefresh, setNeedRefresh],
     offlineReady: [offlineReady, setOfflineReady],
@@ -27,7 +28,17 @@ export function Toasts() {
   if (toast)
     return (
       <div className="toast" role="status">
-        {toast}
+        {toast.msg}
+        {toast.action && (
+          <button
+            onClick={() => {
+              toast.action!.run();
+              clear();
+            }}
+          >
+            {toast.action.label}
+          </button>
+        )}
       </div>
     );
   return null;

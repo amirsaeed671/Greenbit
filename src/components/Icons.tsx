@@ -34,3 +34,25 @@ export const IconFlame = (p: SVGProps<SVGSVGElement>) => (
 export const IconChart = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base(p)}><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></svg>
 );
+export const IconToday = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}><rect x="3" y="5" width="18" height="16" rx="3" /><path d="M3 10h18M8 3v4M16 3v4" /><circle cx="12" cy="15.5" r="2" /></svg>
+);
+export const IconUpcoming = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}><rect x="3" y="5" width="18" height="16" rx="3" /><path d="M3 10h18M8 3v4M16 3v4M8 14h2M14 14h2M8 17.5h2" /></svg>
+);
+export const IconInbox = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}><path d="M3 13h5l1.5 3h5L16 13h5" /><path d="M5.5 5h13L21 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-6Z" /></svg>
+);
+export const IconNotes = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}><path d="M6 3h9l4 4v14H6Z" /><path d="M14 3v5h5M9 13h7M9 17h5" /></svg>
+);
+export const IconBrowse = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}><rect x="3" y="3" width="7" height="7" rx="2" /><rect x="14" y="3" width="7" height="7" rx="2" /><rect x="3" y="14" width="7" height="7" rx="2" /><rect x="14" y="14" width="7" height="7" rx="2" /></svg>
+);
+export const IconHash = (p: SVGProps<SVGSVGElement>) => <svg {...base(p)}><path d="M5 9h15M4 15h15M10 3 8 21M16 3l-2 18" /></svg>;
+export const IconTag = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}><path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9Z" /><circle cx="7.5" cy="7.5" r="1.5" /></svg>
+);
+export const IconSync = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4" /></svg>
+);

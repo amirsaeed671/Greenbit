@@ -33,7 +33,7 @@ export default function HabitDetail() {
   }, [habit, entries, today, w]);
 
   if (!loaded) return null;
-  if (!habit || !data) return <div className="page"><h1>Habit not found</h1><Link to="/">Back to garden</Link></div>;
+  if (!habit || !data) return <div className="page"><h1>Habit not found</h1><Link to="/habits">Back to garden</Link></div>;
 
   const last12 = data.hist.slice(-12);
   const max = Math.max(habit.stretch, ...last12.map((r) => r.volume));
@@ -113,13 +113,13 @@ export default function HabitDetail() {
         {habit.archivedAt ? (
           <button className="btn" onClick={() => void repo.restoreHabit(habit.id)}>Restore to garden</button>
         ) : (
-          <button className="btn" onClick={() => { void repo.archiveHabit(habit.id, today); navigate('/'); }}>Archive</button>
+          <button className="btn" onClick={() => { void repo.archiveHabit(habit.id, today); navigate('/habits'); }}>Archive</button>
         )}
         <button
           className="btn danger"
           onClick={() => {
             if (window.confirm(`Delete “${habit.name}” and all ${data.list.length} entries? This can’t be undone. Consider archiving instead.`)) {
-              void repo.deleteHabit(habit.id).then(() => navigate('/'));
+              void repo.deleteHabit(habit.id).then(() => navigate('/habits'));
             }
           }}
         >

@@ -8,6 +8,11 @@ export interface Celebration {
   habitName: string;
 }
 
+export interface Toast {
+  msg: string;
+  action?: { label: string; run: () => void };
+}
+
 interface UIState {
   today: string;
   refreshToday: () => void;
@@ -18,8 +23,10 @@ interface UIState {
   celebration: Celebration | null;
   celebrate: (c: Omit<Celebration, 'id'>) => void;
   clearCelebration: () => void;
-  toast: string | null;
-  showToast: (msg: string) => void;
+  toast: Toast | null;
+  showToast: (msg: string, action?: Toast['action']) => void;
+  quickAddOpen: boolean;
+  setQuickAdd: (open: boolean) => void;
 }
 
 const firstOfMonth = (d: string) => `${d.slice(0, 7)}-01`;
@@ -38,8 +45,11 @@ export const useUI = create<UIState>((set, get) => ({
   celebrate: (c) => set({ celebration: { ...c, id: Date.now() } }),
   clearCelebration: () => set({ celebration: null }),
   toast: null,
-  showToast: (msg) => {
-    set({ toast: msg });
-    window.setTimeout(() => get().toast === msg && set({ toast: null }), 3200);
+  showToast: (msg, action) => {
+    const t = { msg, action };
+    set({ toast: t });
+    window.setTimeout(() => get().toast === t && set({ toast: null }), action ? 5000 : 3200);
   },
+  quickAddOpen: false,
+  setQuickAdd: (open) => set({ quickAddOpen: open }),
 }));
