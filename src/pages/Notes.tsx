@@ -17,14 +17,36 @@ function NotePane({ note }: { note: Note }) {
   const [title, setTitle] = useState(note.title);
   const pending = useRef<string | null>(null);
   const timer = useRef(0);
+  const titleRef = useRef<HTMLInputElement>(null);
+  /** The body this pane last loaded or saved. Any other value arriving means another device changed it. */
+  const known = useRef(note.body);
+  const [revision, setRevision] = useState(0);
 
-  useEffect(() => setTitle(note.title), [note.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    setTitle(note.title);
+    known.current = note.body;
+  }, [note.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // A newer version synced from another device: show it in place, unless you're mid-edit
+  // (then your version is saved and becomes the newest).
+  useEffect(() => {
+    if (note.body !== known.current && pending.current === null) {
+      known.current = note.body;
+      setRevision((r) => r + 1);
+    }
+  }, [note.body]);
+  useEffect(() => {
+    if (document.activeElement !== titleRef.current) setTitle(note.title);
+  }, [note.title]);
 
   // Autosave the body half a second after typing stops, and on leaving.
   const flush = () => {
     window.clearTimeout(timer.current);
     const body = pending.current?.trim();
-    if (body !== undefined && body !== note.body) void noteRepo.update(note.id, { body });
+    if (body !== undefined && body !== note.body) {
+      known.current = body;
+      void noteRepo.update(note.id, { body });
+    }
     pending.current = null;
   };
   useEffect(() => flush, [note.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -60,6 +82,7 @@ function NotePane({ note }: { note: Note }) {
         </button>
       </div>
       <input
+        ref={titleRef}
         className="note-title"
         value={title}
         placeholder="Title"
@@ -71,6 +94,7 @@ function NotePane({ note }: { note: Note }) {
       <Suspense fallback={<p className="muted">Loading editor…</p>}>
         <NoteEditor
           docKey={note.id}
+          revision={revision}
           value={note.body}
           onChange={(md) => {
             pending.current = md;
@@ -127,7 +151,7 @@ export default function Notes() {
               <li key={n.id}>
                 <Link to={`/notes/${n.id}`} className={`note-row${n.id === id ? ' active' : ''}`} aria-current={n.id === id ? 'page' : undefined}>
                   <strong>{n.pinned && <span aria-label="Pinned">📌 </span>}{noteTitle(n)}</strong>
-                  <span className="muted small note-snippet">{noteSnippet(n.title.trim() ? n.body : n.body.split('\n').slice(1).join('\n')) || 'No content'}</span>
+                  <span className="muted small note-snippet">{(n.title.trim() ? noteSnippet(n.body) : noteSnippet(n.body).replace(noteTitle(n), '').trim()) || 'No content'}</span>
                   <span className="muted small row" style={{ gap: 6 }}>
                     {formatDistanceToNow(new Date(n.updatedAt ?? n.createdAt), { addSuffix: true })}
                     {p && (

@@ -144,12 +144,26 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 .nav-brand, .nav-credit, .side-links { display: none; }
 .nav-links { display: flex; flex: 1; }
-.nav a.tab {
+.nav a.tab, .nav button.tab {
   flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
   text-decoration: none; color: var(--text-2); font-size: 0.72rem; font-weight: 700; min-width: 0;
 }
-.nav a.tab svg { width: 24px; height: 24px; }
-.nav a.tab.active { color: var(--brand); }
+.nav button.tab { border: 0; background: transparent; cursor: pointer; font-family: inherit; padding: 0; }
+.nav .tab svg { width: 24px; height: 24px; }
+.nav .tab.active { color: var(--brand); }
+
+.drawer-backdrop { position: fixed; inset: 0; z-index: 45; background: rgba(10, 20, 14, 0.45); }
+.drawer {
+  position: absolute; inset: 0 auto 0 0; width: min(320px, 86vw); background: var(--surface);
+  display: flex; flex-direction: column; box-shadow: 4px 0 24px rgba(0, 0, 0, 0.18);
+  padding: calc(14px + env(safe-area-inset-top)) 12px calc(14px + env(safe-area-inset-bottom));
+}
+.drawer-head { display: flex; align-items: center; justify-content: space-between; padding: 0 0 10px 6px; }
+.drawer-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+.drawer-brand span { font-family: var(--font-display); font-weight: 700; font-size: 1.3rem; color: var(--brand-strong); }
+.drawer-links { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 1px; overscroll-behavior: contain; }
+.drawer-credit { text-align: left; padding: 12px 10px 0; }
+@media (min-width: 860px) { .drawer-backdrop { display: none; } }
 
 .side-link {
   display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 10px;

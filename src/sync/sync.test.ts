@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { deriveKeys, linkToSeed, newSeed, open, seal, seedToLink, seedToWords, wordsToSeed } from './crypto';
 import { emptyState, mergeStates, type SyncState } from './merge';
-import { EVENT_GAP_MS, POLL_MS } from './engine';
+import { conflictBackoff, EVENT_GAP_MS, POLL_MS, retryDelay } from './engine';
 
 const st = (tables: Partial<SyncState['tables']>, settings?: SyncState['settings']): SyncState => ({ ...emptyState(), tables: { ...emptyState().tables, ...tables }, settings });
 const task = (id: string, hlc: string, extra = {}) => ({ id, hlc, title: id, ...extra }) as never;
@@ -87,5 +87,12 @@ describe('sync polling', () => {
   it('polls every 5 minutes; event checks at most once a minute', () => {
     expect(POLL_MS).toBe(300000);
     expect(EVENT_GAP_MS).toBe(60000);
+  });
+  it('conflict retries back off with jitter; failures really retry later', () => {
+    expect(conflictBackoff(0, 0)).toBe(150);
+    expect(conflictBackoff(0, 1)).toBe(450);
+    expect(conflictBackoff(3, 0.5)).toBe(2400);
+    expect(conflictBackoff(10, 0.5)).toBe(4000);
+    expect([0, 1, 2, 3, 4, 5].map(retryDelay)).toEqual([15000, 30000, 60000, 120000, 240000, 300000]);
   });
 });

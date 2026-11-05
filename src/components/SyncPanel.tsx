@@ -2,7 +2,7 @@ import { formatDistanceToNow } from 'date-fns';
 import QRCode from 'qrcode';
 import { useEffect, useState } from 'react';
 import { deriveKeys, newSeed, seedToLink, seedToWords, wordsToSeed } from '../sync/crypto';
-import { deleteRemoteAndLeave, enableSync, getDeviceName, getSeed, leaveSync, renameDevice, syncNow, useSync } from '../sync/engine';
+import { deleteRemoteAndLeave, enableSync, getDeviceName, getSeed, leaveSync, renameDevice, repairSync, syncNow, useSync } from '../sync/engine';
 import { repo } from '../db/repo';
 
 function AddDevice() {
@@ -127,7 +127,17 @@ export function SyncPanel() {
         <span className="spacer" />
         <button className="btn small" onClick={() => void syncNow()} disabled={s.phase === 'syncing'}>Sync now</button>
       </div>
-      {s.phase === 'error' && <p className="banner small" role="alert">{s.error}</p>}
+      {s.phase === 'error' && (
+        <div className="banner small stack" role="alert" style={{ gap: 8, alignItems: 'stretch' }}>
+          <span>{s.error}</span>
+          <span className="muted">
+            <strong>Repair sync</strong> downloads the synced copy, merges it with this device (keeping the newest version of every task, note and habit from both), and saves the result for all devices. Nothing on this device is lost.
+          </span>
+          <div>
+            <button className="btn small primary" onClick={() => void repairSync()}>Repair sync</button>
+          </div>
+        </div>
+      )}
       {s.phase === 'offline' && <p className="muted small" style={{ margin: 0 }}>You’re offline. Changes are kept here and sync when you reconnect.</p>}
       <p className="muted small" style={{ margin: 0 }}>
         Chain fingerprint <code>{s.fingerprint}</code>. It’s the same on every device in this chain.

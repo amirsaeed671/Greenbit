@@ -67,6 +67,16 @@ async function localState(): Promise<{ state: SyncState }> {
   return { state: { v: 1, at: new Date().toISOString(), tables, settings: s ? { value: s.value, hlc: s.hlc } : undefined } };
 }
 
+class SyncError extends Error {
+  constructor(message: string, readonly retry: boolean) {
+    super(message);
+  }
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** Randomised, growing wait between conflict retries, so two writers stop colliding. */
+export const conflictBackoff = (attempt: number, rand = Math.random()) => Math.round(Math.min(4000, 300 * 2 ** attempt) * (0.5 + rand));
+
 async function request(method: 'GET' | 'PUT' | 'DELETE', body?: unknown, etag?: string): Promise<Response> {
   if (!keys) throw new Error('Sync is not set up');
   return fetch(ENDPOINT, {
@@ -78,23 +88,34 @@ async function request(method: 'GET' | 'PUT' | 'DELETE', body?: unknown, etag?: 
     },
     body: body ? JSON.stringify(body) : undefined,
     cache: 'no-store',
+  }).catch(() => {
+    throw new SyncError('Couldn’t reach the sync relay. Retrying automatically.', true);
   });
 }
 
-async function syncOnce(): Promise<void> {
+const MAX_ATTEMPTS = 6;
+
+/**
+ * One sync: pull, merge per record, push if this device has anything newer.
+ * `force` (Repair): always pull the full copy and overwrite the relay with the merge,
+ * even if another device wrote a moment ago. Nothing is dropped: the merge keeps the
+ * newest version of every record from both sides.
+ */
+async function syncOnce(force = false): Promise<void> {
   const config = await getConfig();
   if (!config) return;
   keys ??= await deriveKeys(b64u.dec(config.seed));
   const saved = ((await db.local.get(STATE))?.value as { etag?: string; syncedHlc?: string } | undefined) ?? {};
   const me = await repo.deviceId();
 
-  for (let attempt = 0; attempt < 4; attempt++) {
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    if (attempt > 0) await sleep(conflictBackoff(attempt - 1));
     // Pending local changes = anything stamped after the last successful sync. Derived from the data,
     // so it survives reloads and closed tabs.
-    const pending = (await localMaxHlc()) > (saved.syncedHlc ?? '');
+    const pending = force || (await localMaxHlc()) > (saved.syncedHlc ?? '');
     // Ask "only if changed" when nothing local is pending; otherwise we need the full state to merge.
     const res = await request('GET', undefined, pending ? undefined : saved.etag);
-    if (res.status !== 200 && res.status !== 304 && res.status !== 204) throw new Error(`Relay error ${res.status}`);
+    if (res.status !== 200 && res.status !== 304 && res.status !== 204) throw new SyncError(`The sync relay had a problem (${res.status}). Retrying automatically.`, true);
 
     let remote: RemoteState | null = null;
     let etag: string | null = null;
@@ -104,7 +125,7 @@ async function syncOnce(): Promise<void> {
       try {
         remote = await open<RemoteState>(keys.encKey, body.data);
       } catch {
-        throw new Error('Could not decrypt the synced data. Is this the right sync code?');
+        throw new SyncError('Could not decrypt the synced data. Is this the right sync code?', false);
       }
       // Move our clock past every remote stamp before snapshotting, so any edit made from here on sorts after them.
       let rmax = '';
@@ -139,12 +160,12 @@ async function syncOnce(): Promise<void> {
     const stale = !mine || mine.name !== config.deviceName || Date.now() - Date.parse(mine.lastSeen) > 86400000;
     if (stale) devices[me] = { name: config.deviceName, lastSeen: new Date().toISOString() };
 
-    if (m.remoteChanged || stale || res.status === 204) {
+    if (m.remoteChanged || stale || res.status === 204 || force) {
       const sealed = await seal(keys.encKey, { ...m.state, devices } satisfies RemoteState);
-      const put = await request('PUT', { data: sealed, ifMatch: res.status === 204 ? null : etag });
-      if (put.status === 412) continue; // another device wrote first: pull and merge again
-      if (put.status === 413) throw new Error('Your data is too large to sync (over 4 MB compressed).');
-      if (!put.ok) throw new Error(`Relay error ${put.status}`);
+      const put = await request('PUT', force ? { data: sealed, force: true } : { data: sealed, ifMatch: res.status === 204 ? null : etag });
+      if (put.status === 412) continue; // another device wrote first: wait a moment, pull and merge again
+      if (put.status === 413) throw new SyncError('Your data is too large to sync (over 4 MB compressed).', false);
+      if (!put.ok) throw new SyncError(`The sync relay had a problem (${put.status}). Retrying automatically.`, true);
       etag = ((await put.json()) as { etag: string }).etag;
     }
     // Everything up to the merged snapshot is now on the relay.
@@ -152,13 +173,18 @@ async function syncOnce(): Promise<void> {
     useSync.setState({ lastSyncedAt: new Date().toISOString(), devices, error: undefined });
     return;
   }
-  throw new Error('Too many conflicting writes; will retry shortly');
+  throw new SyncError('Another device kept syncing at the same moment. Retrying automatically, or use Repair sync.', true);
 }
+
+let retryTimer = 0;
+let retryCount = 0;
+/** After a transient failure, really retry: 15 s, 30 s, 1 min, 2 min, then every 5 min. */
+export const retryDelay = (n: number) => Math.min(300000, 15000 * 2 ** n);
 
 let lastAttempt = 0;
 
 /** Run a sync now (coalesces concurrent calls). */
-export function syncNow(): Promise<void> {
+export function syncNow(force = false): Promise<void> {
   lastAttempt = Date.now();
   if (running) {
     again = true;
@@ -168,10 +194,19 @@ export function syncNow(): Promise<void> {
     useSync.setState({ phase: 'offline' });
     return Promise.resolve();
   }
+  window.clearTimeout(retryTimer);
   useSync.setState({ phase: 'syncing' });
-  running = syncOnce()
-    .then(() => useSync.setState({ phase: 'idle' }))
-    .catch((e: Error) => useSync.setState({ phase: 'error', error: e.message }))
+  // Only one tab or window per device syncs at a time (installed app + browser tab share the data).
+  const locked = (fn: () => Promise<void>) => (navigator.locks ? navigator.locks.request('greenbit-sync', fn) : fn());
+  running = locked(() => syncOnce(force))
+    .then(() => {
+      retryCount = 0;
+      useSync.setState({ phase: 'idle', error: undefined });
+    })
+    .catch((e: Error) => {
+      useSync.setState({ phase: 'error', error: e.message });
+      if (!(e instanceof SyncError) || e.retry) retryTimer = window.setTimeout(() => void syncNow(), retryDelay(retryCount++));
+    })
     .finally(() => {
       running = null;
       if (again) {
@@ -201,8 +236,14 @@ export async function getDeviceName() {
   return (await getConfig())?.deviceName ?? defaultDeviceName();
 }
 
+/** Pull the full relay copy, merge everything and overwrite the relay with the result. */
+export function repairSync(): Promise<void> {
+  return syncNow(true);
+}
+
 /** This device stops syncing. Its data stays; the chain and other devices are untouched. */
 export async function leaveSync() {
+  window.clearTimeout(retryTimer);
   await db.local.bulkDelete([CONFIG, STATE]);
   keys = null;
   useSync.setState({ enabled: false, phase: 'off', lastSyncedAt: undefined, error: undefined, fingerprint: undefined, devices: {} });

@@ -20,7 +20,7 @@ export const vercelBlobStore: BlobStore = {
         contentType: 'application/json',
         addRandomSuffix: false,
         cacheControlMaxAge: 60,
-        ...(ifMatch ? { ifMatch } : { allowOverwrite: false }),
+        ...(ifMatch === '*' ? { allowOverwrite: true } : ifMatch ? { ifMatch } : { allowOverwrite: false }),
       });
       return { etag: r.etag };
     } catch (e) {

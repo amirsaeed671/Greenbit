@@ -1,5 +1,5 @@
-import { AnimatePresence, motion } from 'framer-motion';
-import { useEffect, useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { isOpen } from '../core/tasks';
 import { colorHex, PROJECT_COLORS } from '../data/colors';
@@ -7,7 +7,7 @@ import { useTaskData } from '../db/hooks';
 import { taskRepo } from '../db/taskRepo';
 import { useUI } from '../store/ui';
 import { Celebration } from './Celebration';
-import { IconBrowse, IconCalendar, IconChart, IconGarden, IconInbox, IconNotes, IconPlus, IconSettings, IconSun, IconToday, IconUpcoming } from './Icons';
+import { IconBrowse, IconCalendar, IconChart, IconClose, IconGarden, IconInbox, IconNotes, IconPlus, IconSettings, IconSun, IconToday, IconUpcoming } from './Icons';
 import { Credit, LogoMark } from './Logo';
 import { Sheet } from './Sheet';
 import { QuickAdd } from './tasks/QuickAdd';
@@ -21,8 +21,69 @@ const MOBILE_TABS = [
   { to: '/upcoming', label: 'Upcoming', Icon: IconUpcoming },
   { to: '/notes', label: 'Notes', Icon: IconNotes },
   { to: '/habits', label: 'Habits', Icon: IconGarden },
-  { to: '/browse', label: 'Browse', Icon: IconBrowse },
 ];
+
+/** Phone menu: the desktop sidebar, sliding in from the left over the current page. */
+function Drawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const reduce = useReducedMotion();
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.activeElement as HTMLElement | null;
+    const t = window.setTimeout(() => ref.current?.querySelector<HTMLElement>('a, button')?.focus(), 50);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      if (e.key === 'Tab' && ref.current) {
+        const els = ref.current.querySelectorAll<HTMLElement>('a[href], button');
+        const first = els[0];
+        const last = els[els.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.clearTimeout(t);
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = '';
+      prev?.focus?.();
+    };
+  }, [open, onClose]);
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div className="drawer-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.15 } }}>
+          <motion.aside
+            ref={ref}
+            className="drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Menu"
+            initial={reduce ? { opacity: 0 } : { x: '-100%' }}
+            animate={reduce ? { opacity: 1 } : { x: 0 }}
+            exit={reduce ? { opacity: 0 } : { x: '-100%', transition: { duration: 0.18, ease: 'easeIn' } }}
+            transition={{ type: 'tween', duration: 0.22, ease: 'easeOut' }}
+          >
+            <div className="drawer-head">
+              <Link to="/" className="nav-brand drawer-brand" aria-label="Greenbit home" onClick={onClose}>
+                <LogoMark size={30} />
+                <span>Greenbit</span>
+              </Link>
+              <button className="btn ghost icon-btn" onClick={onClose} aria-label="Close menu">
+                <IconClose width={22} height={22} />
+              </button>
+            </div>
+            <div className="drawer-links">
+              <Sidebar />
+            </div>
+            <Credit className="credit drawer-credit" />
+          </motion.aside>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
 
 const HABIT_TABS = [
   { to: '/habits', label: 'Garden', Icon: IconGarden, end: true },
@@ -140,12 +201,18 @@ export function Sidebar() {
 }
 
 export function Layout() {
+  const [drawer, setDrawer] = useState(false);
   const quickAddOpen = useUI((s) => s.quickAddOpen);
   const setQuickAdd = useUI((s) => s.setQuickAdd);
   const { projects, labels, settings } = useTaskData();
   const location = useLocation();
   const onTaskPage = !location.pathname.startsWith('/habits') && !location.pathname.startsWith('/notes') && !location.pathname.startsWith('/settings');
   const projectMatch = location.pathname.match(/^\/projects\/([^/]+)/);
+  // Any navigation (or opening quick add) closes the phone menu.
+  useEffect(() => setDrawer(false), [location.pathname, location.hash]);
+  useEffect(() => {
+    if (quickAddOpen) setDrawer(false);
+  }, [quickAddOpen]);
 
   // Q opens quick add anywhere (unless typing).
   useEffect(() => {
@@ -176,6 +243,10 @@ export function Layout() {
               <span>{label}</span>
             </NavLink>
           ))}
+          <button className={`tab${drawer ? ' active' : ''}`} onClick={() => setDrawer(true)} aria-haspopup="dialog" aria-expanded={drawer}>
+            <IconBrowse />
+            <span>Browse</span>
+          </button>
         </div>
         <Credit className="nav-credit" />
       </nav>
@@ -196,6 +267,7 @@ export function Layout() {
       <Sheet open={quickAddOpen} title="Add task" onClose={() => setQuickAdd(false)}>
         <QuickAdd projects={projects} labels={labels} weekStartsOn={settings.weekStartsOn} defaults={projectMatch ? { projectId: projectMatch[1] } : {}} onClose={() => setQuickAdd(false)} closeOnAdd />
       </Sheet>
+      <Drawer open={drawer} onClose={() => setDrawer(false)} />
       <Celebration />
       <Toasts />
     </div>

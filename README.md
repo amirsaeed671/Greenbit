@@ -177,6 +177,8 @@ Sync follows the model Brave Sync uses: devices share a secret, and a relay stor
 4. **Merging** is per record using hybrid logical clock stamps: the newest edit of each task, note, habit or entry wins, and deletions are tombstones, so a delete on one device beats an older edit on another. Writes are conditional on the relay's ETag; if two devices write at once, the later one re-merges and retries, so nothing is overwritten.
 5. **When it syncs:** on open, a few seconds after an edit, when you come back to the app (focus the window, show the tab, or the first tap after a pause; at most once a minute), when back online, and every 5 minutes while visible. It never polls in the background. Pending changes are worked out from the data itself, so an edit is never lost by closing a tab quickly.
 
+**If something goes wrong:** conflicting writes are retried with a short random backoff, only one tab or window per device syncs at a time, and a failed sync retries automatically (15 s, 30 s, 1 min, then up to every 5 min). If it still can't settle, **Settings → Sync → Repair sync** downloads the synced copy, merges it per record with this device (keeping the newest version of everything from both) and saves the result for all devices. Nothing on the device is dropped. An open note updates in place when another device edits it, unless you're typing in it at that moment.
+
 Limits: tombstones are forgotten after 60 days, so a device that stays offline longer than that could bring back something you deleted. Each chain is capped at 4 MB compressed. Anyone with your 24 words or link can read and change your synced data: treat it like a password.
 
 ## Privacy

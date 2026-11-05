@@ -28,6 +28,13 @@ describe('relay', () => {
     // a device holding the old etag must re-merge
     expect((await handle(req('PUT', { data: 'old', ifMatch: etag }), s)).status).toBe(412);
   });
+  it('force overwrites regardless of etag (repair)', async () => {
+    const s = new MemoryStore();
+    await handle(req('PUT', { data: 'one', ifMatch: null }), s);
+    expect((await handle(req('PUT', { data: 'two', ifMatch: '"stale"' }), s)).status).toBe(412);
+    expect((await handle(req('PUT', { data: 'two', force: true }), s)).status).toBe(200);
+    expect((await (await handle(req('GET'), s)).json()).data).toBe('two');
+  });
   it('different keys never see each other’s data', async () => {
     const s = new MemoryStore();
     await handle(req('PUT', { data: 'mine', ifMatch: null }), s);

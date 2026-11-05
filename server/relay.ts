@@ -17,7 +17,7 @@ export class Conflict extends Error {}
 
 export interface BlobStore {
   read(path: string, ifNoneMatch?: string): Promise<StoredBlob | 'not-modified' | null>;
-  /** ifMatch: replace only if current etag matches; null: create only if absent. */
+  /** ifMatch: replace only if current etag matches; null: create only if absent; '*': write unconditionally (repair). */
   write(path: string, text: string, ifMatch: string | null): Promise<{ etag: string }>;
   remove(path: string): Promise<void>;
 }
@@ -54,10 +54,11 @@ export async function handle(req: Request, store: BlobStore): Promise<Response> 
     if (req.method === 'PUT') {
       const len = Number(req.headers.get('content-length') ?? 0);
       if (len > MAX_BYTES) return json(413, { error: 'Sync data too large' });
-      const body = (await req.json().catch(() => null)) as { data?: unknown; ifMatch?: unknown } | null;
+      const body = (await req.json().catch(() => null)) as { data?: unknown; ifMatch?: unknown; force?: unknown } | null;
       if (!body || typeof body.data !== 'string' || !/^[A-Za-z0-9_-]+$/.test(body.data)) return json(400, { error: 'Body must be { data: base64url, ifMatch: string | null }' });
       if (body.data.length > MAX_BYTES) return json(413, { error: 'Sync data too large' });
-      const ifMatch = typeof body.ifMatch === 'string' ? body.ifMatch : null;
+      // force: a client-side "Repair" that has just merged the latest copy overwrites unconditionally.
+      const ifMatch = body.force === true ? '*' : typeof body.ifMatch === 'string' ? body.ifMatch : null;
       try {
         const { etag } = await store.write(path, body.data, ifMatch);
         return json(200, { etag }, { etag });
@@ -90,7 +91,7 @@ export class MemoryStore implements BlobStore {
   }
   async write(path: string, text: string, ifMatch: string | null) {
     const cur = this.m.get(path);
-    if (ifMatch === null ? !!cur : cur?.etag !== ifMatch) throw new Conflict();
+    if (ifMatch !== '*' && (ifMatch === null ? !!cur : cur?.etag !== ifMatch)) throw new Conflict();
     const etag = `"e${++this.n}"`;
     this.m.set(path, { text, etag });
     return { etag };

@@ -33,6 +33,8 @@ interface Props {
   onChange: (md: string) => void;
   /** Changing this resets the editor to `value` (opening another note). */
   docKey: string;
+  /** Bumped when `value` was changed elsewhere (sync); reloads it, keeping the cursor if possible. */
+  revision?: number;
   placeholder?: string;
 }
 
@@ -127,7 +129,7 @@ function Toolbar({ editor, source, setSource }: { editor: Editor; source: boolea
   );
 }
 
-export default function NoteEditor({ value, onChange, docKey, placeholder = 'Write something… Markdown shortcuts work: # heading, - list, [ ] checklist, ``` code' }: Props) {
+export default function NoteEditor({ value, onChange, docKey, revision = 0, placeholder = 'Write something… Markdown shortcuts work: # heading, - list, [ ] checklist, ``` code' }: Props) {
   const [source, setSource] = useState(false);
   const [raw, setRaw] = useState(value);
   const changeRef = useRef(onChange);
@@ -157,6 +159,19 @@ export default function NoteEditor({ value, onChange, docKey, placeholder = 'Wri
     setRaw(value);
     setSource(false);
   }, [docKey, editor]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The same note changed on another device: load it in place.
+  useEffect(() => {
+    if (!editor || revision === 0) return;
+    const { from, to } = editor.state.selection;
+    const hadFocus = editor.isFocused;
+    editor.commands.setContent(value, { contentType: 'markdown', emitUpdate: false });
+    setRaw(value);
+    if (hadFocus) {
+      const max = editor.state.doc.content.size;
+      editor.commands.setTextSelection({ from: Math.min(from, max), to: Math.min(to, max) });
+    }
+  }, [revision]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleSource = (on: boolean) => {
     if (!editor) return;
