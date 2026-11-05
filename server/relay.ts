@@ -26,6 +26,13 @@ export interface BlobStore {
   remove(path: string): Promise<void>;
 }
 
+/**
+ * Version tags can come back "weak" (W/"…") when a read passes through a CDN edge that
+ * re-encodes the response (seen from the Singapore region), while the store compares writes
+ * against the strong form. Same version either way, so always compare the strong form.
+ */
+export const strongEtag = (e: string) => e.replace(/^W\//i, '');
+
 export const MAX_BYTES = 4 * 1024 * 1024; // Vercel function body limit is 4.5 MB
 
 const json = (status: number, body: unknown, headers: Record<string, string> = {}) =>
@@ -55,13 +62,15 @@ async function route(req: Request, store: BlobStore): Promise<Response> {
 
   try {
     if (req.method === 'GET') {
-      const ifNoneMatch = req.headers.get('if-none-match') ?? undefined;
+      const inm = req.headers.get('if-none-match');
+      const ifNoneMatch = inm ? strongEtag(inm) : undefined;
       const r = await store.read(path, ifNoneMatch);
       trace(path, { m: 'GET', s: r === 'not-modified' ? 304 : r ? 200 : 204, inm: ifNoneMatch ?? null, etag: r && r !== 'not-modified' ? r.etag : null });
       if (r === 'not-modified') return new Response(null, { status: 304, headers: { etag: ifNoneMatch!, 'cache-control': 'no-store' } });
       // Empty chain: 204 rather than 404, so browsers don't log it as an error.
       if (!r) return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } });
-      return json(200, { etag: r.etag, data: r.text }, { etag: r.etag });
+      const etag = strongEtag(r.etag);
+      return json(200, { etag, data: r.text }, { etag });
     }
 
     if (req.method === 'PUT') {
@@ -71,9 +80,9 @@ async function route(req: Request, store: BlobStore): Promise<Response> {
       if (!body || typeof body.data !== 'string' || !/^[A-Za-z0-9_-]+$/.test(body.data)) return json(400, { error: 'Body must be { data: base64url, ifMatch: string | null }' });
       if (body.data.length > MAX_BYTES) return json(413, { error: 'Sync data too large' });
       // force: a client-side "Repair" that has just merged the latest copy overwrites unconditionally.
-      const ifMatch = body.force === true ? '*' : typeof body.ifMatch === 'string' ? body.ifMatch : null;
+      const ifMatch = body.force === true ? '*' : typeof body.ifMatch === 'string' ? strongEtag(body.ifMatch) : null;
       try {
-        const { etag } = await store.write(path, body.data, ifMatch);
+        const etag = strongEtag((await store.write(path, body.data, ifMatch)).etag);
         trace(path, { m: 'PUT', s: 200, ifMatch, etag, bytes: body.data.length });
         return json(200, { etag }, { etag });
       } catch (e) {

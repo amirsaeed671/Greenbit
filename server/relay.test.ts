@@ -28,6 +28,20 @@ describe('relay', () => {
     // a device holding the old etag must re-merge
     expect((await handle(req('PUT', { data: 'old', ifMatch: etag }), s)).status).toBe(412);
   });
+  it('treats a weak version tag (W/"…") as the same version', async () => {
+    // Reads through some CDN edges return W/"etag"; writes must still match the stored "etag".
+    const s = new MemoryStore();
+    const c = await handle(req('PUT', { data: 'one', ifMatch: null }), s);
+    const { etag } = await c.json();
+    const weak = `W/${etag}`;
+    const u = await handle(req('PUT', { data: 'two', ifMatch: weak }), s);
+    expect(u.status).toBe(200);
+    const { etag: e2 } = await u.json();
+    expect(e2.startsWith('W/')).toBe(false);
+    expect((await handle(req('GET', undefined, { 'if-none-match': `W/${e2}` }), s)).status).toBe(304);
+    // A genuinely different version still conflicts
+    expect((await handle(req('PUT', { data: 'x', ifMatch: 'W/"nope"' }), s)).status).toBe(412);
+  });
   it('force overwrites regardless of etag (repair)', async () => {
     const s = new MemoryStore();
     await handle(req('PUT', { data: 'one', ifMatch: null }), s);
