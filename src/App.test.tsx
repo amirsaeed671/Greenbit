@@ -6,12 +6,12 @@ vi.mock('virtual:pwa-register/react', () => ({
 }));
 
 describe('App', () => {
-  it('opens on Today with an empty state, a sourced quote and the author credit', async () => {
+  it('opens on Today with an empty state, no quote in the way, and the author credit', async () => {
     const { default: App } = await import('./App');
     render(<App />);
     expect(await screen.findByRole('heading', { name: 'Today' })).toBeInTheDocument();
     expect(await screen.findByText(/Nothing due today/)).toBeInTheDocument();
-    expect(screen.getByLabelText('Quote of the day').querySelector('cite')?.textContent).toBeTruthy();
+    expect(screen.queryByLabelText('Quote of the day')).toBeNull();
     expect(screen.getAllByRole('link', { name: 'Amir Ali' })[0]).toHaveAttribute('href', 'https://amir-ali.me');
   });
 });
