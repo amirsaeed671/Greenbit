@@ -100,7 +100,9 @@ export function startReminderScheduler(): () => void {
       const last = ((await db.local.get(LAST))?.value as number | undefined) ?? now;
       const due = remindersInWindow(tasks, Math.min(last, now) - 1, now, new Set(Object.keys(fired)));
       for (const r of due) fired[r.key] = now;
-      await db.local.bulkPut([{ key: FIRED, value: fired }, { key: LAST, value: now }]);
+      // A hidden tab only writes when it actually fires something: browsers freeze background
+      // tabs, and one frozen in the middle of a write blocks every other Greenbit tab from saving.
+      if (due.length || document.visibilityState === 'visible') await db.local.bulkPut([{ key: FIRED, value: fired }, { key: LAST, value: now }]);
       if (due.length) await fire(due);
     } finally {
       checking = false;

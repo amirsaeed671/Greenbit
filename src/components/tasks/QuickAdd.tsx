@@ -27,13 +27,29 @@ interface Props {
 }
 
 /** Input with Todoist-style highlighting: the text is drawn by an overlay; the input above it is transparent. */
-function HighlightInput({ value, onChange, tokens, inputRef, onKeyDown }: { value: string; onChange: (v: string) => void; tokens: Token[]; inputRef: React.RefObject<HTMLInputElement>; onKeyDown: (e: React.KeyboardEvent) => void }) {
+function HighlightInput({
+  value,
+  onChange,
+  tokens,
+  inputRef,
+  onKeyDown,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  tokens: Token[];
+  inputRef: React.RefObject<HTMLInputElement>;
+  onKeyDown: (e: React.KeyboardEvent) => void;
+}) {
   const overlay = useRef<HTMLDivElement>(null);
   const parts: React.ReactNode[] = [];
   let pos = 0;
   tokens.forEach((t, i) => {
     parts.push(value.slice(pos, t.start));
-    parts.push(<mark key={i} className={`tok tok-${t.kind}`}>{value.slice(t.start, t.end)}</mark>);
+    parts.push(
+      <mark key={i} className={`tok tok-${t.kind}`}>
+        {value.slice(t.start, t.end)}
+      </mark>,
+    );
     pos = t.end;
   });
   parts.push(value.slice(pos));
@@ -75,7 +91,12 @@ export function QuickAdd({ projects, labels, weekStartsOn, defaults = {}, onClos
   }, [autoFocus]);
 
   const parsed = useMemo(
-    () => parseQuickAdd(text, today, { projects: projects.map((p) => p.name), labels: labels.map((l) => l.name), weekStartsOn }),
+    () =>
+      parseQuickAdd(text, today, {
+        projects: projects.map((p) => p.name),
+        labels: labels.map((l) => l.name),
+        weekStartsOn,
+      }),
     [text, today, projects, labels, weekStartsOn],
   );
   const dueDate = parsed.dueDate ?? (manualDate || undefined);
@@ -84,35 +105,80 @@ export function QuickAdd({ projects, labels, weekStartsOn, defaults = {}, onClos
   const projectName = parsed.project ?? projects.find((p) => p.id === manualProject)?.name;
   const labelNames = [...new Set([...(defaults.labelId ? [labels.find((l) => l.id === defaults.labelId)?.name ?? ''] : []), ...parsed.labels].filter(Boolean))];
 
+  const [saving, setSaving] = useState(false);
+  // A save can finish after this sheet was closed (and a new one opened); it must not close that one.
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const submit = async () => {
-    if (!parsed.title) return;
-    // Capture everything, clear or close right away, then save in the background.
-    const snap = { parsed, description: description.trim(), dueDate, dueTime, priority, projectName, labelNames, manualProject };
-    setText('');
-    setDescription('');
-    if (closeOnAdd) onClose?.();
-    else inputRef.current?.focus();
+    if (!parsed.title || saving) return;
+    const snap = {
+      text,
+      rawDescription: description,
+      parsed,
+      description: description.trim(),
+      dueDate,
+      dueTime,
+      priority,
+      projectName,
+      labelNames,
+      manualProject,
+    };
+    setSaving(true);
     try {
-      const { projectId, labelIds } = await taskRepo.resolveNames(snap.projectName, snap.labelNames, projects, labels);
-      const reminders: Reminder[] = snap.parsed.remindMinutesBefore !== undefined && snap.dueTime ? [{ id: uid(), type: 'relative', minutesBefore: snap.parsed.remindMinutesBefore }] : [];
-      const task = await taskRepo.addTask({
-        title: snap.parsed.title,
-        description: snap.description || undefined,
-        projectId: snap.parsed.project ? projectId : snap.manualProject || undefined,
-        priority: snap.priority,
-        labels: labelIds,
-        dueDate: snap.dueDate,
-        dueTime: snap.dueDate ? snap.dueTime : undefined,
-        recurrence: snap.parsed.recurrence,
-        reminders,
-        createdAt: today,
-      });
-      if (reminders.length && notificationPermission() === 'default') void requestNotifications();
+      // Only report success once the task is really saved: the sheet stays open (text intact) until then.
+      // If storage is stuck, the button keeps saying "Saving…" and the storage alert explains why;
+      // the save finishes on its own once the storage is free, so retrying never makes duplicates.
+      const task = await (async () => {
+        const { projectId, labelIds } = await taskRepo.resolveNames(snap.projectName, snap.labelNames, projects, labels);
+        const reminders: Reminder[] =
+          snap.parsed.remindMinutesBefore !== undefined && snap.dueTime
+            ? [
+                {
+                  id: uid(),
+                  type: 'relative',
+                  minutesBefore: snap.parsed.remindMinutesBefore,
+                },
+              ]
+            : [];
+        const task = await taskRepo.addTask({
+          title: snap.parsed.title,
+          description: snap.description || undefined,
+          projectId: snap.parsed.project ? projectId : snap.manualProject || undefined,
+          priority: snap.priority,
+          labels: labelIds,
+          dueDate: snap.dueDate,
+          dueTime: snap.dueDate ? snap.dueTime : undefined,
+          recurrence: snap.parsed.recurrence,
+          reminders,
+          createdAt: today,
+        });
+        return { task, reminders };
+      })();
+      if (!mounted.current) {
+        /* already closed */
+      } else if (closeOnAdd) onClose?.();
+      else {
+        // Keep anything typed while it was saving.
+        setText((t) => (t === snap.text ? '' : t));
+        setDescription((d) => (d === snap.rawDescription ? '' : d));
+        inputRef.current?.focus();
+      }
+      if (task.reminders.length && notificationPermission() === 'default') void requestNotifications();
       const where = (snap.parsed.project ? snap.projectName : projects.find((p) => p.id === snap.manualProject)?.name) ?? 'Inbox';
       const note = snap.parsed.remindMinutesBefore !== undefined && !snap.dueTime ? ' (reminder skipped: add a time)' : '';
-      showToast(`Task added to ${where}${note}`, { label: 'Undo', run: () => void taskRepo.deleteTask(task.id) });
+      showToast(`Task added to ${where}${note}`, {
+        label: 'Undo',
+        run: () => void taskRepo.deleteTask(task.task.id),
+      });
     } catch (e) {
       showToast(`Couldn’t save “${snap.parsed.title}”: ${(e as Error).message}`);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -149,17 +215,24 @@ export function QuickAdd({ projects, labels, weekStartsOn, defaults = {}, onClos
           </span>
         )}
         <label className={`chip${priority < 4 ? ' set' : ''}`}>
-          <span className={`flag p${priority}`} aria-hidden="true">⚑</span>
+          <span className={`flag p${priority}`} aria-hidden="true">
+            ⚑
+          </span>
           <select value={priority} onChange={(e) => setManualPriority(Number(e.target.value) as Priority)} aria-label="Priority" disabled={!!parsed.priority}>
             {[1, 2, 3, 4].map((p) => (
-              <option key={p} value={p}>P{p}</option>
+              <option key={p} value={p}>
+                P{p}
+              </option>
             ))}
           </select>
         </label>
         {parsed.recurrence && <span className="chip set">↻ {describeRecurrence(parsed.recurrence)}</span>}
         {parsed.remindMinutesBefore !== undefined && <span className="chip set">⏰ {parsed.remindMinutesBefore} min before</span>}
         {labelNames.map((l) => (
-          <span key={l} className="chip set">@{l}{!labels.some((x) => x.name.toLowerCase() === l.toLowerCase()) && ' (new)'}</span>
+          <span key={l} className="chip set">
+            @{l}
+            {!labels.some((x) => x.name.toLowerCase() === l.toLowerCase()) && ' (new)'}
+          </span>
         ))}
       </div>
       <div className="qa-foot">
@@ -171,9 +244,13 @@ export function QuickAdd({ projects, labels, weekStartsOn, defaults = {}, onClos
         ) : (
           <select className="chip" value={manualProject} onChange={(e) => setManualProject(e.target.value)} aria-label="Project">
             <option value="">📥 Inbox</option>
-            {projects.filter((p) => !p.archivedAt).map((p) => (
-              <option key={p.id} value={p.id}># {p.name}</option>
-            ))}
+            {projects
+              .filter((p) => !p.archivedAt)
+              .map((p) => (
+                <option key={p.id} value={p.id}>
+                  # {p.name}
+                </option>
+              ))}
           </select>
         )}
         <span className="spacer" />
@@ -182,8 +259,8 @@ export function QuickAdd({ projects, labels, weekStartsOn, defaults = {}, onClos
             Cancel
           </button>
         )}
-        <button type="submit" className="btn small primary" disabled={!parsed.title}>
-          Add task
+        <button type="submit" className="btn small primary" disabled={!parsed.title || saving}>
+          {saving ? 'Saving…' : 'Add task'}
         </button>
       </div>
     </form>

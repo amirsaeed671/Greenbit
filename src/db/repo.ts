@@ -4,11 +4,9 @@ import { encode, newer, receive, tick, type Clock } from '../core/hlc';
 import type { Entry, Habit, Settings, SyncMeta } from '../core/types';
 import { DEFAULT_SETTINGS } from '../core/types';
 import { db as defaultDb, SYNCED, type GreenbitDB, type SyncedTable } from './db';
+import { trackWrite } from './pending';
 
-export const uid = () =>
-  typeof crypto !== 'undefined' && 'randomUUID' in crypto
-    ? crypto.randomUUID()
-    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+export const uid = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
 
 const iso = () => new Date().toISOString();
 const alive = <T extends SyncMeta>(r: T | undefined): r is T => !!r && !r.deletedAt;
@@ -45,25 +43,40 @@ export function makeRepo(db: GreenbitDB = defaultDb) {
 
   const changed = () => changeListeners.forEach((f) => f());
 
+  /**
+   * One transaction per change: the record and the clock it was stamped with commit together,
+   * and the promise only resolves once the change is really on disk.
+   */
+  const write = <T>(table: SyncedTable, fn: () => Promise<T>): Promise<T> => trackWrite(db.transaction('rw', [db.table(table), db.local], fn));
+
   async function save<T extends { id: string } & SyncMeta>(table: SyncedTable, record: T): Promise<T> {
-    const r = { ...record, hlc: await stamp(), updatedAt: iso() } as T;
-    await db.table(table).put(r);
+    const r = await write(table, async () => {
+      const r = { ...record, hlc: await stamp(), updatedAt: iso() } as T;
+      await db.table(table).put(r);
+      return r;
+    });
     changed();
     return r;
   }
 
   async function patch<T extends SyncMeta>(table: SyncedTable, id: string, change: Partial<T>) {
-    const cur = await db.table(table).get(id);
-    if (!alive(cur)) return;
-    await db.table(table).put({ ...cur, ...change, hlc: await stamp(), updatedAt: iso() });
-    changed();
+    const done = await write(table, async () => {
+      const cur = await db.table(table).get(id);
+      if (!alive(cur)) return false;
+      await db.table(table).put({ ...cur, ...change, hlc: await stamp(), updatedAt: iso() });
+      return true;
+    });
+    if (done) changed();
   }
 
   async function remove(table: SyncedTable, id: string) {
-    const cur = await db.table(table).get(id);
-    if (!cur || cur.deletedAt) return;
-    await db.table(table).put({ ...cur, deletedAt: iso(), hlc: await stamp() });
-    changed();
+    const done = await write(table, async () => {
+      const cur = await db.table(table).get(id);
+      if (!cur || cur.deletedAt) return false;
+      await db.table(table).put({ ...cur, deletedAt: iso(), hlc: await stamp() });
+      return true;
+    });
+    if (done) changed();
   }
 
   return {
@@ -81,11 +94,22 @@ export function makeRepo(db: GreenbitDB = defaultDb) {
 
     async getSettings(): Promise<Settings> {
       const row = await db.kv.get('settings');
-      return { ...DEFAULT_SETTINGS, ...((row?.value as Partial<Settings>) ?? {}) };
+      return {
+        ...DEFAULT_SETTINGS,
+        ...((row?.value as Partial<Settings>) ?? {}),
+      };
     },
     async updateSettings(change: Partial<Settings>) {
-      const current = await this.getSettings();
-      await db.kv.put({ key: 'settings', value: { ...current, ...change }, hlc: await stamp() });
+      await trackWrite(
+        db.transaction('rw', [db.kv, db.local], async () => {
+          const current = await this.getSettings();
+          await db.kv.put({
+            key: 'settings',
+            value: { ...current, ...change },
+            hlc: await stamp(),
+          });
+        }),
+      );
       changed();
     },
 
@@ -118,7 +142,10 @@ export function makeRepo(db: GreenbitDB = defaultDb) {
       if (!(data.volume > 0)) throw new Error('Volume must be greater than 0');
       const habit = await db.habits.get(data.habitId);
       if (!alive(habit)) throw new Error('Habit not found');
-      if (data.date < habit.createdAt) await patch<Habit>('habits', habit.id, { createdAt: minDate(data.date, habit.createdAt) });
+      if (data.date < habit.createdAt)
+        await patch<Habit>('habits', habit.id, {
+          createdAt: minDate(data.date, habit.createdAt),
+        });
       const id = uid();
       await save('entries', { ...data, id });
       return id;
@@ -137,11 +164,11 @@ export function makeRepo(db: GreenbitDB = defaultDb) {
 
     /** Live (non-deleted) records of every synced table, plus settings. */
     async snapshot() {
-      const [tables, settings] = await Promise.all([
-        Promise.all(SYNCED.map(async (t) => [t, (await db.table(t).toArray()).filter((r: SyncMeta) => !r.deletedAt)] as const)),
-        this.getSettings(),
-      ]);
-      return { ...(Object.fromEntries(tables) as unknown as Pick<BackupFile, SyncedTable>), settings };
+      const [tables, settings] = await Promise.all([Promise.all(SYNCED.map(async (t) => [t, (await db.table(t).toArray()).filter((r: SyncMeta) => !r.deletedAt)] as const)), this.getSettings()]);
+      return {
+        ...(Object.fromEntries(tables) as unknown as Pick<BackupFile, SyncedTable>),
+        settings,
+      };
     },
 
     /**
@@ -149,33 +176,45 @@ export function makeRepo(db: GreenbitDB = defaultDb) {
      * the removal also reaches synced devices. Merge keeps the newer edit of each record.
      */
     async importData(file: BackupFile, mode: 'merge' | 'replace') {
-      await db.transaction('rw', [...SYNCED.map((t) => db.table(t)), db.kv, db.local], async () => {
-        for (const t of SYNCED) {
-          const incoming = file[t] as ({ id: string } & SyncMeta)[];
-          if (mode === 'replace') {
-            const ids = new Set(incoming.map((r) => r.id));
-            for (const cur of await db.table(t).toArray()) if (!cur.deletedAt && !ids.has(cur.id)) await db.table(t).put({ ...cur, deletedAt: iso(), hlc: await stamp() });
-            for (const { deletedAt: _d, ...r } of incoming) await db.table(t).put({ ...r, hlc: await stamp() });
-          } else {
-            for (const r of incoming) {
-              const cur = await db.table(t).get(r.id);
-              if (!cur || newer(r.hlc, cur.hlc)) await db.table(t).put(r);
+      await trackWrite(
+        db.transaction('rw', [...SYNCED.map((t) => db.table(t)), db.kv, db.local], async () => {
+          for (const t of SYNCED) {
+            const incoming = file[t] as ({ id: string } & SyncMeta)[];
+            if (mode === 'replace') {
+              const ids = new Set(incoming.map((r) => r.id));
+              for (const cur of await db.table(t).toArray()) if (!cur.deletedAt && !ids.has(cur.id)) await db.table(t).put({ ...cur, deletedAt: iso(), hlc: await stamp() });
+              for (const { deletedAt: _d, ...r } of incoming) await db.table(t).put({ ...r, hlc: await stamp() });
+            } else {
+              for (const r of incoming) {
+                const cur = await db.table(t).get(r.id);
+                if (!cur || newer(r.hlc, cur.hlc)) await db.table(t).put(r);
+              }
             }
           }
-        }
-        if (mode === 'replace') {
-          const keep = await this.getSettings();
-          await db.kv.put({ key: 'settings', value: { ...file.settings, lastExportAt: keep.lastExportAt }, hlc: await stamp() });
-        }
-      });
+          if (mode === 'replace') {
+            const keep = await this.getSettings();
+            await db.kv.put({
+              key: 'settings',
+              value: { ...file.settings, lastExportAt: keep.lastExportAt },
+              hlc: await stamp(),
+            });
+          }
+        }),
+      );
       changed();
     },
 
     async resetAll() {
-      await db.transaction('rw', [...SYNCED.map((t) => db.table(t)), db.kv, db.local], async () => {
-        for (const t of SYNCED) for (const cur of await db.table(t).toArray()) if (!cur.deletedAt) await db.table(t).put({ ...cur, deletedAt: iso(), hlc: await stamp() });
-        await db.kv.put({ key: 'settings', value: { ...DEFAULT_SETTINGS }, hlc: await stamp() });
-      });
+      await trackWrite(
+        db.transaction('rw', [...SYNCED.map((t) => db.table(t)), db.kv, db.local], async () => {
+          for (const t of SYNCED) for (const cur of await db.table(t).toArray()) if (!cur.deletedAt) await db.table(t).put({ ...cur, deletedAt: iso(), hlc: await stamp() });
+          await db.kv.put({
+            key: 'settings',
+            value: { ...DEFAULT_SETTINGS },
+            hlc: await stamp(),
+          });
+        }),
+      );
       changed();
     },
   };

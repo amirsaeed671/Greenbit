@@ -4,6 +4,7 @@ import App from './App';
 import { startReminderScheduler } from './reminders/scheduler';
 import { startSyncEngine } from './sync/engine';
 import { useUI } from './store/ui';
+import { startWriteWatch } from './db/pending';
 import './styles/global.css';
 
 // Ask the browser not to evict our IndexedDB data. Export is still the safety net.
@@ -22,6 +23,7 @@ try {
   /* storage unavailable */
 }
 
+startWriteWatch();
 startReminderScheduler();
 startSyncEngine();
 

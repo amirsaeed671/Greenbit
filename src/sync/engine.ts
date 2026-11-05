@@ -94,7 +94,8 @@ export function logSync(what: string) {
   activity = [...activity, { at: new Date().toISOString(), what }].slice(-40);
   useSync.setState({ activity });
   window.clearTimeout(logTimer);
-  logTimer = window.setTimeout(() => void db.local.put({ key: LOG, value: activity }), 500);
+  // Persisted from visible tabs only (see the note on hidden tabs in syncOnce); the next visible log saves it all.
+  logTimer = window.setTimeout(() => document.visibilityState === 'visible' && void db.local.put({ key: LOG, value: activity }), 500);
 }
 const short = (etag: string | null | undefined) => (etag ? etag.replace(/"/g, '').slice(0, 6) : '-');
 /** Randomised, growing wait between conflict retries, so two writers stop colliding. */
@@ -149,6 +150,11 @@ async function syncOnce(force = false): Promise<void> {
      * missing on its next sync and sends them again. Nothing is lost; it just converges.
      */
     const forceThis = force || rejected >= 2;
+    // In a hidden tab, only upload (to flush this device's edits) and leave local storage alone:
+    // the browser may freeze the tab mid-write, which would block every other Greenbit tab from saving.
+    // The next visible sync pulls and applies everything, because nothing below marks it as applied.
+    const background = document.visibilityState === 'hidden';
+
     // Pending local changes = anything stamped after the last successful sync. Derived from the data,
     // so it survives reloads and closed tabs.
     const pending = forceThis || (await localMaxHlc()) > (saved.syncedHlc ?? '');
@@ -170,7 +176,7 @@ async function syncOnce(force = false): Promise<void> {
       let rmax = '';
       for (const t of SYNCED) for (const r of remote.tables[t] ?? []) if ((r.hlc ?? '') > rmax) rmax = r.hlc!;
       if (remote.settings?.hlc && remote.settings.hlc > rmax) rmax = remote.settings.hlc;
-      if (rmax) await repo.observe(rmax);
+      if (rmax && !background) await repo.observe(rmax);
     } else if (res.status === 304) {
       // Relay unchanged since our last merge and nothing local is pending.
       useSync.setState({ lastSyncedAt: new Date().toISOString() });
@@ -182,7 +188,7 @@ async function syncOnce(force = false): Promise<void> {
     const m = mergeStates(local, remote);
 
     // Apply what the other devices changed, without re-stamping.
-    const touched = Object.keys(m.toLocal).length || Object.keys(m.purge).length || m.settingsToLocal;
+    const touched = !background && (Object.keys(m.toLocal).length || Object.keys(m.purge).length || m.settingsToLocal);
     if (touched) {
       await db.transaction('rw', [...SYNCED.map((t) => db.table(t)), db.kv], async () => {
         for (const t of SYNCED) {
@@ -192,7 +198,7 @@ async function syncOnce(force = false): Promise<void> {
         if (m.settingsToLocal) await db.kv.put({ key: 'settings', value: m.settingsToLocal.value, hlc: m.settingsToLocal.hlc });
       });
     }
-    if (m.maxHlc) await repo.observe(m.maxHlc);
+    if (m.maxHlc && !background) await repo.observe(m.maxHlc);
 
     // Keep a small device list so each device can show who else is syncing.
     const devices: Record<string, DeviceInfo> = { ...(remote?.devices ?? {}) };
@@ -201,7 +207,7 @@ async function syncOnce(force = false): Promise<void> {
     if (stale) devices[me] = { name: config.deviceName, lastSeen: new Date().toISOString() };
 
     const applied = Object.values(m.toLocal).reduce((n, xs) => n + (xs?.length ?? 0), 0);
-    if (applied) logSync(`applied ${applied} change${applied === 1 ? '' : 's'} from other devices`);
+    if (applied && !background) logSync(`applied ${applied} change${applied === 1 ? '' : 's'} from other devices`);
     if (m.remoteChanged || stale || res.status === 204 || forceThis) {
       const sealed = await seal(keys.encKey, { ...m.state, devices } satisfies RemoteState);
       const put = await request('PUT', forceThis ? { data: sealed, force: true } : { data: sealed, ifMatch: res.status === 204 ? null : etag });
@@ -214,6 +220,10 @@ async function syncOnce(force = false): Promise<void> {
       etag = ((await put.json()) as { etag: string }).etag;
     }
     // Everything up to the merged snapshot is now on the relay.
+    if (background) {
+      useSync.setState({ lastSyncedAt: new Date().toISOString(), devices, error: undefined });
+      return;
+    }
     await db.local.put({ key: STATE, value: { etag, syncedHlc: m.maxHlc > (saved.syncedHlc ?? '') ? m.maxHlc : saved.syncedHlc } });
     useSync.setState({ lastSyncedAt: new Date().toISOString(), devices, error: undefined });
     return;

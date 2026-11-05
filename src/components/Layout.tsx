@@ -14,6 +14,7 @@ import { QuickAdd } from './tasks/QuickAdd';
 import { Toasts } from './Toasts';
 import { useSync } from '../sync/engine';
 import { SyncAlert } from './SyncAlert';
+import { StorageAlert } from './StorageAlert';
 import { IconBug, IconSync } from './Icons';
 import { ReportBugLink } from './ReportBug';
 
@@ -273,6 +274,7 @@ export function Layout() {
       </Sheet>
       <Drawer open={drawer} onClose={() => setDrawer(false)} />
       <SyncAlert />
+      <StorageAlert />
       <Celebration />
       <Toasts />
     </div>
