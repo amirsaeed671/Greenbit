@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { deriveKeys, linkToSeed, newSeed, open, seal, seedToLink, seedToWords, wordsToSeed } from './crypto';
 import { emptyState, mergeStates, type SyncState } from './merge';
+import { EVENT_GAP_MS, POLL_MS } from './engine';
 
 const st = (tables: Partial<SyncState['tables']>, settings?: SyncState['settings']): SyncState => ({ ...emptyState(), tables: { ...emptyState().tables, ...tables }, settings });
 const task = (id: string, hlc: string, extra = {}) => ({ id, hlc, title: id, ...extra }) as never;
@@ -79,5 +80,12 @@ describe('sync merge', () => {
     const m = mergeStates(st({}, { value: { weekStartsOn: 1 }, hlc: '1' }), st({}, { value: { weekStartsOn: 0 }, hlc: '2' }));
     expect(m.settingsToLocal?.value).toEqual({ weekStartsOn: 0 });
     expect(mergeStates(st({}), null).remoteChanged).toBe(true);
+  });
+});
+
+describe('sync polling', () => {
+  it('polls every 5 minutes; event checks at most once a minute', () => {
+    expect(POLL_MS).toBe(300000);
+    expect(EVENT_GAP_MS).toBe(60000);
   });
 });

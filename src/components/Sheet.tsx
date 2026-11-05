@@ -40,7 +40,7 @@ export function Sheet({ open, title, onClose, children }: Props) {
   return (
     <AnimatePresence>
       {open && (
-        <motion.div className="sheet-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+        <motion.div className="sheet-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.15 } }}>
           <motion.div
             ref={ref}
             className="sheet"
@@ -49,7 +49,7 @@ export function Sheet({ open, title, onClose, children }: Props) {
             aria-labelledby={id}
             initial={reduce ? false : { y: 40, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            exit={reduce ? { opacity: 0 } : { y: 40, opacity: 0 }}
+            exit={reduce ? { opacity: 0, transition: { duration: 0.1 } } : { y: 24, opacity: 0, transition: { duration: 0.15, ease: 'easeIn' } }}
             transition={{ type: 'spring', damping: 26, stiffness: 300 }}
           >
             <div className="sheet-head">

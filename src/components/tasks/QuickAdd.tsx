@@ -21,6 +21,8 @@ interface Props {
   defaults?: QuickAddDefaults;
   onClose?: () => void;
   autoFocus?: boolean;
+  /** Close after adding (the modal). Inline composers stay open for the next task, like Todoist. */
+  closeOnAdd?: boolean;
 }
 
 /** Input with Todoist-style highlighting: the text is drawn by an overlay; the input above it is transparent. */
@@ -56,7 +58,7 @@ function HighlightInput({ value, onChange, tokens, inputRef, onKeyDown }: { valu
   );
 }
 
-export function QuickAdd({ projects, labels, weekStartsOn, defaults = {}, onClose, autoFocus = true }: Props) {
+export function QuickAdd({ projects, labels, weekStartsOn, defaults = {}, onClose, autoFocus = true, closeOnAdd = false }: Props) {
   const today = useUI((s) => s.today);
   const showToast = useUI((s) => s.showToast);
   const [text, setText] = useState('');
@@ -83,25 +85,34 @@ export function QuickAdd({ projects, labels, weekStartsOn, defaults = {}, onClos
 
   const submit = async () => {
     if (!parsed.title) return;
-    const { projectId, labelIds } = await taskRepo.resolveNames(projectName, labelNames, projects, labels);
-    const reminders: Reminder[] = parsed.remindMinutesBefore !== undefined && dueTime ? [{ id: uid(), type: 'relative', minutesBefore: parsed.remindMinutesBefore }] : [];
-    await taskRepo.addTask({
-      title: parsed.title,
-      description: description.trim() || undefined,
-      projectId: parsed.project ? projectId : manualProject || undefined,
-      priority,
-      labels: labelIds,
-      dueDate,
-      dueTime: dueDate ? dueTime : undefined,
-      recurrence: parsed.recurrence,
-      reminders,
-      createdAt: today,
-    });
-    if (reminders.length && notificationPermission() === 'default') void requestNotifications();
-    if (parsed.remindMinutesBefore !== undefined && !dueTime) showToast('Reminder skipped: add a time to remind before it');
+    // Capture everything, clear or close right away, then save in the background.
+    const snap = { parsed, description: description.trim(), dueDate, dueTime, priority, projectName, labelNames, manualProject };
     setText('');
     setDescription('');
-    inputRef.current?.focus();
+    if (closeOnAdd) onClose?.();
+    else inputRef.current?.focus();
+    try {
+      const { projectId, labelIds } = await taskRepo.resolveNames(snap.projectName, snap.labelNames, projects, labels);
+      const reminders: Reminder[] = snap.parsed.remindMinutesBefore !== undefined && snap.dueTime ? [{ id: uid(), type: 'relative', minutesBefore: snap.parsed.remindMinutesBefore }] : [];
+      const task = await taskRepo.addTask({
+        title: snap.parsed.title,
+        description: snap.description || undefined,
+        projectId: snap.parsed.project ? projectId : snap.manualProject || undefined,
+        priority: snap.priority,
+        labels: labelIds,
+        dueDate: snap.dueDate,
+        dueTime: snap.dueDate ? snap.dueTime : undefined,
+        recurrence: snap.parsed.recurrence,
+        reminders,
+        createdAt: today,
+      });
+      if (reminders.length && notificationPermission() === 'default') void requestNotifications();
+      const where = (snap.parsed.project ? snap.projectName : projects.find((p) => p.id === snap.manualProject)?.name) ?? 'Inbox';
+      const note = snap.parsed.remindMinutesBefore !== undefined && !snap.dueTime ? ' (reminder skipped: add a time)' : '';
+      showToast(`Task added to ${where}${note}`, { label: 'Undo', run: () => void taskRepo.deleteTask(task.id) });
+    } catch (e) {
+      showToast(`Couldn’t save “${snap.parsed.title}”: ${(e as Error).message}`);
+    }
   };
 
   const due = dueDate ? dueLabel(dueDate, today) : null;

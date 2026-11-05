@@ -55,11 +55,25 @@ export function TaskSheet({ task, projects, labels, onClose }: { task: Task | nu
   return (
     <Sheet open title={task.completedAt ? 'Completed task' : 'Task'} onClose={onClose}>
       <div className="stack task-sheet">
-        <input
+        <textarea
           className="ts-title"
+          rows={1}
           value={title}
           aria-label="Task name"
-          onChange={(e) => setTitle(e.target.value)}
+          ref={(el) => {
+            // Grow with the text so long titles wrap instead of scrolling sideways.
+            if (el) {
+              el.style.height = 'auto';
+              el.style.height = `${el.scrollHeight + 2}px`;
+            }
+          }}
+          onChange={(e) => setTitle(e.target.value.replace(/\n/g, ' '))}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              e.currentTarget.blur();
+            }
+          }}
           onBlur={() => title.trim() && title !== task.title && set({ title: title.trim() })}
         />
         <textarea

@@ -56,3 +56,6 @@ export const IconTag = (p: SVGProps<SVGSVGElement>) => (
 export const IconSync = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base(p)}><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4" /></svg>
 );
+export const IconBug = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}><rect x="7" y="8" width="10" height="12" rx="5" /><path d="M12 8v12M9 5l1.5 2M15 5l-1.5 2M4 13h3M17 13h3M5 8l2.5 1.5M19 8l-2.5 1.5M5 19l2.5-1.5M19 19l-2.5-1.5" /></svg>
+);

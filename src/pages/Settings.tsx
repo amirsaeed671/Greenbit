@@ -8,6 +8,7 @@ import { Sheet } from '../components/Sheet';
 import { formatLong } from '../components/format';
 import { useUI } from '../store/ui';
 import { SyncPanel } from '../components/SyncPanel';
+import { ReportBugLink, REPO_URL } from '../components/ReportBug';
 import { notificationPermission, requestNotifications, sendTestNotification, type PermissionState } from '../reminders/scheduler';
 
 async function shareOrDownload(file: BackupFile, name: string) {
@@ -193,6 +194,24 @@ export default function Settings() {
           . See more work at <a href={AUTHOR.url} target="_blank" rel="noopener noreferrer">amir-ali.me</a>.
         </p>
         <p className="muted small">Daily quotes come from public-domain translations of classic works, each with a named source.</p>
+        <div className="row">
+          <ReportBugLink className="btn">🐞 Report a bug</ReportBugLink>
+          <a className="btn ghost" href={REPO_URL} target="_blank" rel="noopener noreferrer">Source on GitHub</a>
+        </div>
+        <p className="muted small" style={{ margin: 0 }}>
+          Reporting opens a pre-filled issue on GitHub with technical details only (app version, browser, screen size, whether sync and notifications are on). None of your tasks, notes or habits are included, and nothing is sent until you submit it.
+        </p>
+      </section>
+
+      <section className="card stack" id="privacy">
+        <h2 style={{ margin: 0 }}>Privacy</h2>
+        <ul className="privacy-list">
+          <li><strong>No analytics, no tracking.</strong> Greenbit collects no analytics, telemetry or usage data, shows no ads, and uses no cookies or third-party trackers.</li>
+          <li><strong>Your data stays on your devices.</strong> Tasks, notes and habits are stored in this browser. There’s no account and nothing to sign up for.</li>
+          <li><strong>Sync is end-to-end encrypted.</strong> If you turn it on, your data is encrypted on this device before upload. The relay stores only ciphertext it can’t read, and only your sync code can unlock it.</li>
+          <li><strong>Nothing leaves without you.</strong> No crash reports or diagnostics are sent automatically. Bug reports are only what you choose to submit on GitHub.</li>
+          <li className="muted">Like any website, the host (Vercel) keeps standard short-lived request logs, such as IP address and time, to serve the site and the sync relay.</li>
+        </ul>
       </section>
 
       <Sheet open={!!pending} title="Import backup" onClose={() => setPending(null)}>

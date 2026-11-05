@@ -155,8 +155,11 @@ async function syncOnce(): Promise<void> {
   throw new Error('Too many conflicting writes; will retry shortly');
 }
 
+let lastAttempt = 0;
+
 /** Run a sync now (coalesces concurrent calls). */
 export function syncNow(): Promise<void> {
+  lastAttempt = Date.now();
   if (running) {
     again = true;
     return running;
@@ -211,12 +214,25 @@ export async function deleteRemoteAndLeave() {
   await leaveSync();
 }
 
-const FIVE_MIN = 5 * 60000;
+/**
+ * Background check for other devices' changes while the app is visible: every 5 minutes,
+ * to keep relay reads (Vercel Blob operations) low. Never while the app is hidden.
+ */
+export const POLL_MS = 5 * 60000;
+/** Event-driven checks (focus, returning to the app) are limited to one per minute. */
+export const EVENT_GAP_MS = 60000;
 
-/** Wire up automatic syncing: on start, after local edits, on focus, when back online, and every 5 minutes while visible. */
+/**
+ * Wire up automatic syncing: on start, a few seconds after local edits, when the window
+ * regains focus or the user returns after a pause, when back online, and on an adaptive poll.
+ */
 export function startSyncEngine(): () => void {
   let debounce = 0;
-  let interval = 0;
+  let poll = 0;
+  let lastActivity = Date.now();
+  const enabled = () => useSync.getState().enabled;
+  const visible = () => document.visibilityState === 'visible';
+
   void (async () => {
     const c = await getConfig();
     if (!c) return;
@@ -224,29 +240,55 @@ export function startSyncEngine(): () => void {
     useSync.setState({ enabled: true, phase: 'idle', fingerprint: keys.fingerprint });
     void syncNow();
   })();
+
+  const schedule = () => {
+    window.clearTimeout(poll);
+    poll = window.setTimeout(() => {
+      if (enabled() && visible() && Date.now() - lastAttempt >= 5000) void syncNow();
+      schedule();
+    }, POLL_MS);
+  };
+  schedule();
+
+  /** Check now if it's been a while, e.g. on focus or the first tap after a pause. */
+  const freshen = (minGap: number) => {
+    if (enabled() && visible() && Date.now() - lastAttempt > minGap) void syncNow();
+  };
+
   const off = repo.onChange(() => {
-    if (!useSync.getState().enabled) return;
+    if (!enabled()) return;
     window.clearTimeout(debounce);
     debounce = window.setTimeout(() => void syncNow(), 3000);
   });
-  const onVisible = () => {
-    if (document.visibilityState === 'visible' && useSync.getState().enabled) void syncNow();
+  // Coming back to the app (first tap after a pause, focusing the window, showing the tab) pulls the latest.
+  const onActivity = () => {
+    const wasIdle = Date.now() - lastActivity > EVENT_GAP_MS;
+    lastActivity = Date.now();
+    if (wasIdle) freshen(EVENT_GAP_MS);
   };
-  const onOnline = () => useSync.getState().enabled && void syncNow();
-  const onHide = () => {
-    // Flush pending edits when the tab is hidden or closed.
-    if (document.visibilityState === 'hidden' && useSync.getState().enabled) void syncNow();
+  const onVisibility = () => {
+    if (visible()) {
+      lastActivity = Date.now();
+      freshen(EVENT_GAP_MS);
+    } else if (enabled()) void syncNow(); // flush pending edits when hidden or closing
   };
-  document.addEventListener('visibilitychange', onVisible);
-  document.addEventListener('visibilitychange', onHide);
+  const onFocus = () => {
+    lastActivity = Date.now();
+    freshen(EVENT_GAP_MS);
+  };
+  const onOnline = () => enabled() && void syncNow();
+
+  document.addEventListener('visibilitychange', onVisibility);
+  window.addEventListener('focus', onFocus);
   window.addEventListener('online', onOnline);
-  interval = window.setInterval(() => document.visibilityState === 'visible' && useSync.getState().enabled && void syncNow(), FIVE_MIN);
+  for (const ev of ['pointerdown', 'keydown', 'touchstart', 'wheel'] as const) window.addEventListener(ev, onActivity, { passive: true });
   return () => {
     off();
     window.clearTimeout(debounce);
-    window.clearInterval(interval);
-    document.removeEventListener('visibilitychange', onVisible);
-    document.removeEventListener('visibilitychange', onHide);
+    window.clearTimeout(poll);
+    document.removeEventListener('visibilitychange', onVisibility);
+    window.removeEventListener('focus', onFocus);
     window.removeEventListener('online', onOnline);
+    for (const ev of ['pointerdown', 'keydown', 'touchstart', 'wheel'] as const) window.removeEventListener(ev, onActivity);
   };
 }

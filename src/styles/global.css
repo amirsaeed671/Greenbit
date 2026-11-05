@@ -458,8 +458,15 @@ kbd { font: inherit; font-size: 0.8em; padding: 1px 6px; border: 1px solid var(-
 .flag.p1 { color: var(--p1); } .flag.p2 { color: var(--p2); } .flag.p3 { color: var(--p3); } .flag.p4 { color: var(--p4); }
 
 .task-sheet { gap: 14px; }
-.ts-title { font-size: 1.2rem; font-weight: 800; border: 0; border-bottom: 1px solid var(--border); background: transparent; padding: 6px 0; }
-.ts-desc { border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; background: var(--surface); resize: vertical; font-size: 0.92rem; }
+.ts-title, .ts-desc {
+  width: 100%; border: 1px solid var(--border); border-radius: 12px; background: var(--surface);
+  padding: 10px 14px; transition: border-color 0.15s, box-shadow 0.15s;
+}
+.ts-title { font-size: 1.15rem; font-weight: 800; line-height: 1.35; min-height: 48px; resize: none; overflow: hidden; display: block; }
+.ts-desc { font-size: 0.92rem; line-height: 1.5; resize: vertical; min-height: 84px; }
+.ts-title:hover, .ts-desc:hover { border-color: color-mix(in srgb, var(--brand) 35%, var(--border)); }
+.ts-title:focus-visible, .ts-desc:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 22%, transparent); }
+.task-sheet .ts-title + .ts-desc { margin-top: -6px; }
 .ts-grid { display: grid; gap: 12px; grid-template-columns: 1fr; }
 @media (min-width: 560px) { .ts-grid { grid-template-columns: 1fr 1fr; } .ts-grid > :nth-child(3) { grid-column: 1 / -1; } }
 .ts-section { border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; margin: 0; }
@@ -573,6 +580,11 @@ kbd { font: inherit; font-size: 0.8em; padding: 1px 6px; border: 1px solid var(-
 .sync-qr svg { width: 100%; height: 100%; display: block; }
 .sync-words { columns: 3; column-gap: 16px; margin: 0; padding-left: 28px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.88rem; }
 @media (max-width: 420px) { .sync-words { columns: 2; } }
+
+/* While a sheet is open, toasts move to the top so they never cover its inputs. */
+body:has(.sheet-backdrop) .toast { top: calc(16px + env(safe-area-inset-top)); bottom: auto; }
+
+.privacy-list { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 8px; }
 
 .toast {
   position: fixed; left: 50%; bottom: calc(var(--nav-h) + 16px + env(safe-area-inset-bottom)); transform: translateX(-50%);
@@ -713,8 +725,15 @@ kbd { font: inherit; font-size: 0.8em; padding: 1px 6px; border: 1px solid var(-
 .flag.p1 { color: var(--p1); } .flag.p2 { color: var(--p2); } .flag.p3 { color: var(--p3); } .flag.p4 { color: var(--p4); }
 
 .task-sheet { gap: 14px; }
-.ts-title { font-size: 1.2rem; font-weight: 800; border: 0; border-bottom: 1px solid var(--border); background: transparent; padding: 6px 0; }
-.ts-desc { border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; background: var(--surface); resize: vertical; font-size: 0.92rem; }
+.ts-title, .ts-desc {
+  width: 100%; border: 1px solid var(--border); border-radius: 12px; background: var(--surface);
+  padding: 10px 14px; transition: border-color 0.15s, box-shadow 0.15s;
+}
+.ts-title { font-size: 1.15rem; font-weight: 800; line-height: 1.35; min-height: 48px; resize: none; overflow: hidden; display: block; }
+.ts-desc { font-size: 0.92rem; line-height: 1.5; resize: vertical; min-height: 84px; }
+.ts-title:hover, .ts-desc:hover { border-color: color-mix(in srgb, var(--brand) 35%, var(--border)); }
+.ts-title:focus-visible, .ts-desc:focus-visible { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 22%, transparent); }
+.task-sheet .ts-title + .ts-desc { margin-top: -6px; }
 .ts-grid { display: grid; gap: 12px; grid-template-columns: 1fr; }
 @media (min-width: 560px) { .ts-grid { grid-template-columns: 1fr 1fr; } .ts-grid > :nth-child(3) { grid-column: 1 / -1; } }
 .ts-section { border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; margin: 0; }

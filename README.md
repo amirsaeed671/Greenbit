@@ -175,9 +175,17 @@ Sync follows the model Brave Sync uses: devices share a secret, and a relay stor
 2. **Two keys are derived** with HKDF-SHA256: an AES-256-GCM key that never leaves your devices, and a relay key that authorises access. The relay stores data under `SHA-256(relay key)`, so it never holds the key itself, and there are no accounts.
 3. **What's uploaded** is one blob per chain: every record, gzipped, then encrypted. The relay (`api/sync.ts`, backed by a private Vercel Blob store) only sees ciphertext and its size.
 4. **Merging** is per record using hybrid logical clock stamps: the newest edit of each task, note, habit or entry wins, and deletions are tombstones, so a delete on one device beats an older edit on another. Writes are conditional on the relay's ETag; if two devices write at once, the later one re-merges and retries, so nothing is overwritten.
-5. **When it syncs:** on open, a few seconds after an edit, when the tab regains focus or comes back online, and every 5 minutes while open. Pending changes are worked out from the data itself, so an edit is never lost by closing a tab quickly.
+5. **When it syncs:** on open, a few seconds after an edit, when you come back to the app (focus the window, show the tab, or the first tap after a pause; at most once a minute), when back online, and every 5 minutes while visible. It never polls in the background. Pending changes are worked out from the data itself, so an edit is never lost by closing a tab quickly.
 
 Limits: tombstones are forgotten after 60 days, so a device that stays offline longer than that could bring back something you deleted. Each chain is capped at 4 MB compressed. Anyone with your 24 words or link can read and change your synced data: treat it like a password.
+
+## Privacy
+
+- **No analytics, no tracking.** Greenbit collects no analytics, telemetry or usage data, shows no ads, and uses no cookies or third-party trackers.
+- **Your data stays on your devices**, in the browser's IndexedDB. There are no accounts.
+- **Sync is end-to-end encrypted**: the relay only ever stores ciphertext.
+- **No automatic crash reports.** The in-app **Report a bug** button opens a pre-filled GitHub issue with technical details only (version, browser, screen size, whether sync and notifications are on). Nothing is sent until you submit it.
+- Like any website, the host (Vercel) keeps standard short-lived request logs (IP address, time).
 
 ## Reminders: what to expect
 

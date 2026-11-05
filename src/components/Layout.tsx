@@ -13,7 +13,8 @@ import { Sheet } from './Sheet';
 import { QuickAdd } from './tasks/QuickAdd';
 import { Toasts } from './Toasts';
 import { useSync } from '../sync/engine';
-import { IconSync } from './Icons';
+import { IconBug, IconSync } from './Icons';
+import { ReportBugLink } from './ReportBug';
 
 const MOBILE_TABS = [
   { to: '/', label: 'Today', Icon: IconToday, end: true },
@@ -128,6 +129,9 @@ export function Sidebar() {
       <div className="side-group" />
       <NavLink to="/settings" className={cls}><IconSettings /> <span>Settings</span></NavLink>
       <SyncBadge />
+      <ReportBugLink className="side-link">
+        <IconBug /> <span>Report a bug</span>
+      </ReportBugLink>
       <Sheet open={newProject} title="New project" onClose={() => setNewProject(false)}>
         <NewProject onDone={() => setNewProject(false)} />
       </Sheet>
@@ -190,7 +194,7 @@ export function Layout() {
         )}
       </AnimatePresence>
       <Sheet open={quickAddOpen} title="Add task" onClose={() => setQuickAdd(false)}>
-        <QuickAdd projects={projects} labels={labels} weekStartsOn={settings.weekStartsOn} defaults={projectMatch ? { projectId: projectMatch[1] } : {}} onClose={() => setQuickAdd(false)} />
+        <QuickAdd projects={projects} labels={labels} weekStartsOn={settings.weekStartsOn} defaults={projectMatch ? { projectId: projectMatch[1] } : {}} onClose={() => setQuickAdd(false)} closeOnAdd />
       </Sheet>
       <Celebration />
       <Toasts />
