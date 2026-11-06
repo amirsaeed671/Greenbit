@@ -129,6 +129,15 @@ function Toolbar({ editor, source, setSource }: { editor: Editor; source: boolea
   );
 }
 
+/**
+ * TipTap's useEditor creates the editor during render and destroys it if the component hasn't
+ * mounted by the next tick. On a slow first render (a phone loading the editor for the first time)
+ * that timer can win: the hook then swaps in a fresh editor, but effects in the same commit still
+ * see the destroyed one, whose commands throw. Treat a destroyed editor like none; the re-render
+ * with the fresh editor runs the effects again.
+ */
+export const usable = (e: Editor | null): e is Editor => !!e && !e.isDestroyed;
+
 export default function NoteEditor({ value, onChange, docKey, revision = 0, placeholder = 'Write something… Markdown shortcuts work: # heading, - list, [ ] checklist, ``` code' }: Props) {
   const [source, setSource] = useState(false);
   const [raw, setRaw] = useState(value);
@@ -154,7 +163,7 @@ export default function NoteEditor({ value, onChange, docKey, revision = 0, plac
 
   // Opening a different note replaces the document without an undo step.
   useEffect(() => {
-    if (!editor) return;
+    if (!usable(editor)) return;
     editor.commands.setContent(value, { contentType: 'markdown', emitUpdate: false });
     setRaw(value);
     setSource(false);
@@ -162,7 +171,7 @@ export default function NoteEditor({ value, onChange, docKey, revision = 0, plac
 
   // The same note changed on another device: load it in place.
   useEffect(() => {
-    if (!editor || revision === 0) return;
+    if (!usable(editor) || revision === 0) return;
     const { from, to } = editor.state.selection;
     const hadFocus = editor.isFocused;
     editor.commands.setContent(value, { contentType: 'markdown', emitUpdate: false });
@@ -174,13 +183,13 @@ export default function NoteEditor({ value, onChange, docKey, revision = 0, plac
   }, [revision]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleSource = (on: boolean) => {
-    if (!editor) return;
+    if (!usable(editor)) return;
     if (on) setRaw(editor.getMarkdown());
     else editor.commands.setContent(raw, { contentType: 'markdown', emitUpdate: false });
     setSource(on);
   };
 
-  if (!editor) return null;
+  if (!usable(editor)) return null;
   return (
     <div className="note-editor">
       <Toolbar editor={editor} source={source} setSource={toggleSource} />
